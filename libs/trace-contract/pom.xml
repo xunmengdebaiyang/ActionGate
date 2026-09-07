@@ -1,0 +1,1 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion><parent><groupId>com.actiongate</groupId><artifactId>actiongate-parent</artifactId><version>0.2.0-SNAPSHOT</version></parent><artifactId>trace-contract</artifactId></project>
