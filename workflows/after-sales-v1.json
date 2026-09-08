@@ -1,0 +1,74 @@
+{
+  "workflow_id": "after-sales",
+  "name": "After-sales ticket resolution",
+  "version": "1.0.0",
+  "entry_node": "query-order",
+  "nodes": [
+    {
+      "id": "query-order",
+      "type": "TOOL",
+      "tool_name": "query_order",
+      "transitions": {
+        "success": "classify",
+        "failure": "manual"
+      }
+    },
+    {
+      "id": "classify",
+      "type": "LLM",
+      "transitions": {
+        "question": "reply",
+        "refund": "approve-refund",
+        "exchange": "exchange",
+        "manual": "manual"
+      }
+    },
+    {
+      "id": "approve-refund",
+      "type": "APPROVAL",
+      "transitions": {
+        "approved": "refund",
+        "rejected": "rejected",
+        "expired": "expired"
+      }
+    },
+    {
+      "id": "refund",
+      "type": "TOOL",
+      "tool_name": "create_refund",
+      "transitions": {
+        "success": "reply",
+        "failure": "manual"
+      }
+    },
+    {
+      "id": "exchange",
+      "type": "TOOL",
+      "tool_name": "create_exchange",
+      "transitions": {
+        "success": "reply",
+        "failure": "manual"
+      }
+    },
+    {
+      "id": "reply",
+      "type": "END",
+      "transitions": {}
+    },
+    {
+      "id": "manual",
+      "type": "END",
+      "transitions": {}
+    },
+    {
+      "id": "rejected",
+      "type": "END",
+      "transitions": {}
+    },
+    {
+      "id": "expired",
+      "type": "END",
+      "transitions": {}
+    }
+  ]
+}

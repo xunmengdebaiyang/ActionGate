@@ -1,0 +1,28 @@
+{
+  "tool_name": "create_exchange",
+  "version": "1.0.0",
+  "side_effect_level": "SIDE_EFFECT",
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "order_id",
+      "sku",
+      "idempotency_key"
+    ],
+    "properties": {
+      "order_id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "sku": {
+        "type": "string",
+        "minLength": 1
+      },
+      "idempotency_key": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

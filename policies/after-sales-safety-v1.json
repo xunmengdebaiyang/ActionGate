@@ -1,0 +1,51 @@
+{
+  "policy_id": "after-sales-safety",
+  "version": "1.0.0",
+  "status": "ACTIVE",
+  "rules": [
+    {
+      "id": "refund-requires-approval",
+      "when": {
+        "tool": "create_refund"
+      },
+      "assert": {
+        "approval.status": "APPROVED"
+      },
+      "on_violation": "BLOCK"
+    },
+    {
+      "id": "refund-within-order-amount",
+      "when": {
+        "tool": "create_refund"
+      },
+      "assert": {
+        "args.amount_lte": "context.order_amount"
+      },
+      "on_violation": "BLOCK"
+    },
+    {
+      "id": "side-effect-needs-idempotency",
+      "when": {
+        "side_effect": true
+      },
+      "assert": {
+        "args.idempotency_key_present": true
+      },
+      "on_violation": "BLOCK"
+    },
+    {
+      "id": "unknown-tool-denied",
+      "when": {
+        "tool_not_in": [
+          "query_order",
+          "create_refund",
+          "create_exchange"
+        ]
+      },
+      "assert": {
+        "always": false
+      },
+      "on_violation": "BLOCK"
+    }
+  ]
+}

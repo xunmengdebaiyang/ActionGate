@@ -1,6 +1,25 @@
 package com.actiongate.policy;
-import com.fasterxml.jackson.databind.JsonNode; import com.fasterxml.jackson.databind.ObjectMapper;
-public final class PolicyValidator { private static final ObjectMapper M=new ObjectMapper(); private PolicyValidator() {}
- public static PolicyDocument parseAndValidate(String json) { try { JsonNode r=M.readTree(json); req(r,"policy_id"); req(r,"version"); if(!r.path("rules").isArray()||r.path("rules").isEmpty()) throw new IllegalArgumentException("rules must not be empty"); for(JsonNode x:r.path("rules")){req(x,"id");req(x,"tool");} return M.treeToValue(r,PolicyDocument.class); } catch(Exception e){throw new IllegalArgumentException("Invalid policy contract: "+e.getMessage(),e);} }
- private static void req(JsonNode n,String f){if(!n.hasNonNull(f)||n.path(f).asText().isBlank())throw new IllegalArgumentException("Missing field: "+f);}
+
+import java.util.HashSet;
+import java.util.Set;
+
+import com.actiongate.contract.ContractJson;
+import com.actiongate.contract.SchemaValidator;
+
+import static com.actiongate.contract.ContractViolationException.require;
+
+public final class PolicyValidator {
+    private static final SchemaValidator SCHEMA = SchemaValidator.resource("/schemas/policy.schema.json");
+
+    private PolicyValidator() {
+    }
+
+    public static PolicyDocument parseAndValidate(String json) {
+        PolicyDocument policy = ContractJson.convert(SCHEMA.validate(json), PolicyDocument.class);
+        Set<String> ids = new HashSet<>();
+        for (var rule : policy.rules()) {
+            require(ids.add(rule.id()), "Duplicate rule id: " + rule.id());
+        }
+        return policy;
+    }
 }

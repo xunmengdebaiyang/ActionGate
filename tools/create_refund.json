@@ -1,0 +1,28 @@
+{
+  "tool_name": "create_refund",
+  "version": "1.0.0",
+  "side_effect_level": "SIDE_EFFECT",
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "order_id",
+      "amount",
+      "idempotency_key"
+    ],
+    "properties": {
+      "order_id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "amount": {
+        "type": "number",
+        "minimum": 0.01
+      },
+      "idempotency_key": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

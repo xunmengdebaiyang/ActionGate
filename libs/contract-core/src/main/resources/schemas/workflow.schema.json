@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workflow_id",
+    "name",
+    "version",
+    "entry_node",
+    "nodes"
+  ],
+  "properties": {
+    "workflow_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "entry_node": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "type",
+          "transitions"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+          },
+          "type": {
+            "enum": [
+              "LLM",
+              "TOOL",
+              "APPROVAL",
+              "END"
+            ]
+          },
+          "tool_name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+          },
+          "transitions": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "TOOL"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "tool_name"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "tool_name"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "END"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "transitions": {
+                  "maxProperties": 0
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "transitions": {
+                  "minProperties": 1
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

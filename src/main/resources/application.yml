@@ -1,8 +1,0 @@
-spring:
-  application:
-    name: actiongate
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
