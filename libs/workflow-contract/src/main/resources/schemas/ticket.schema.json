@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scenario"],
+  "properties": {
+    "order_id": {"type": ["string", "null"], "pattern": "^[0-9]{1,12}$"},
+    "scenario": {"enum": ["ORDER_STATUS", "REFUND_REQUEST", "EXCHANGE_REQUEST", "INSUFFICIENT_INFORMATION"]}
+  }
+}

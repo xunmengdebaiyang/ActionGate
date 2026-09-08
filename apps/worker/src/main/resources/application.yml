@@ -1,12 +1,9 @@
 server:
   address: ${ACTIONGATE_BIND_ADDRESS:127.0.0.1}
-  port: ${ACTIONGATE_API_PORT:8080}
+  port: ${ACTIONGATE_WORKER_PORT:8082}
 spring:
   application:
-    name: actiongate-control-plane
-  jackson:
-    property-naming-strategy: SNAKE_CASE
-    default-property-inclusion: non_null
+    name: actiongate-worker
 actiongate:
   temporal:
     target: ${ACTIONGATE_TEMPORAL_TARGET:127.0.0.1:7233}

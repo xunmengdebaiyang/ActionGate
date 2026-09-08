@@ -18,15 +18,33 @@
   <properties>
     <java.version>21</java.version>
     <json-schema-validator.version>1.5.9</json-schema-validator.version>
+    <temporal.version>1.38.0</temporal.version>
   </properties>
   <modules>
     <module>libs/contract-core</module>
     <module>libs/policy-contract</module>
     <module>libs/trace-contract</module>
+    <module>libs/workflow-contract</module>
+    <module>apps/worker</module>
     <module>apps/control-plane</module>
   </modules>
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.actiongate</groupId>
+        <artifactId>workflow-contract</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.temporal</groupId>
+        <artifactId>temporal-sdk</artifactId>
+        <version>${temporal.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.temporal</groupId>
+        <artifactId>temporal-testing</artifactId>
+        <version>${temporal.version}</version>
+      </dependency>
       <dependency>
         <groupId>com.actiongate</groupId>
         <artifactId>contract-core</artifactId>

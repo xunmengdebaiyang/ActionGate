@@ -3,7 +3,7 @@ package com.actiongate;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = {"com.actiongate.api", "com.actiongate.control"})
 public class ActionGateApplication {
     public static void main(String[] args) {
         SpringApplication.run(ActionGateApplication.class, args);

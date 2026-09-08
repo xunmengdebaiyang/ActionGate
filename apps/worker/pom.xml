@@ -9,30 +9,11 @@
     <version>0.2.0-SNAPSHOT</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
-  <artifactId>control-plane</artifactId>
+  <artifactId>worker</artifactId>
   <dependencies>
     <dependency>
       <groupId>com.actiongate</groupId>
       <artifactId>workflow-contract</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.temporal</groupId>
-      <artifactId>temporal-testing</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.actiongate</groupId>
-      <artifactId>worker</artifactId>
-      <version>${project.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.actiongate</groupId>
-      <artifactId>policy-contract</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.actiongate</groupId>
-      <artifactId>trace-contract</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -43,16 +24,32 @@
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-test</artifactId>
+      <groupId>io.temporal</groupId>
+      <artifactId>temporal-testing</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <resource>
+        <directory>../../tools</directory>
+        <targetPath>tools</targetPath>
+        <includes><include>query_order.json</include></includes>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration><classifier>exec</classifier></configuration>
       </plugin>
     </plugins>
   </build>

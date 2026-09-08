@@ -1,0 +1,48 @@
+{
+  "workflow_id": "after-sales-consultation",
+  "name": "Read-only consultation with manual escalation",
+  "version": "1.0.0",
+  "entry_node": "query-order",
+  "nodes": [
+    {
+      "id": "query-order",
+      "type": "TOOL",
+      "tool_name": "query_order",
+      "transitions": {
+        "success": "classify",
+        "missing_order": "manual",
+        "invalid_input": "manual"
+      }
+    },
+    {
+      "id": "classify",
+      "type": "LLM",
+      "transitions": {
+        "question": "answered",
+        "refund": "refund-manual",
+        "exchange": "exchange-manual",
+        "manual": "manual"
+      }
+    },
+    {
+      "id": "answered",
+      "type": "END",
+      "transitions": {}
+    },
+    {
+      "id": "refund-manual",
+      "type": "END",
+      "transitions": {}
+    },
+    {
+      "id": "exchange-manual",
+      "type": "END",
+      "transitions": {}
+    },
+    {
+      "id": "manual",
+      "type": "END",
+      "transitions": {}
+    }
+  ]
+}

@@ -52,6 +52,13 @@ class ContractTest {
     }
 
     @Test
+    void validatesConsultationWorkflowExample() throws IOException {
+        var definition = WorkflowValidator.parseAndValidate(example("workflows/after-sales-consultation-v1.json"));
+        assertEquals("after-sales-consultation", definition.workflowId());
+        assertEquals("1.0.0", definition.version());
+    }
+
+    @Test
     void rejectsUnknownToolsInCatalog() throws IOException {
         String json = workflow().toString();
         assertThrows(ContractViolationException.class, () -> WorkflowValidator.validateWithTools(json, Map.of()));

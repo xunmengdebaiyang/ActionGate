@@ -1,13 +1,17 @@
-# Contract Skeleton Architecture
+# ActionGate Architecture
 
 ## Module Boundaries
 
 ```text
 control-plane
+  +-- workflow-contract -- contract-core
   +-- policy-contract
   |     +-- contract-core
   +-- trace-contract
         +-- contract-core
+
+worker
+  +-- workflow-contract -- contract-core
 ```
 
 - `contract-core`: strict JSON parsing, bundled JSON Schema validation, WorkflowDefinition,
@@ -16,11 +20,18 @@ control-plane
   and ReleaseDecision data records. It has no Spring dependency and performs no policy evaluation.
 - `trace-contract`: AgentRun, Approval and RunEvent data records with version and trace correlation.
   No persistence, tracing exporter, or execution state machine is installed.
-- `control-plane`: Spring Boot application, HTTP status and Actuator. This is the only executable JAR.
+- `workflow-contract`: versioned Temporal Workflow/Activity interfaces, synthetic ticket schema,
+  and bounded input/result records. Does not depend on either application.
+- `worker`: compiled consultation workflow, Mock Provider and read-only order Activity;
+  Spring Boot process with Temporal namespace health.
+- `control-plane`: Spring Boot submission/query API. Uses Temporal for execution state and
+  results, with no local run registry.
 
 The parent POM aggregates modules and manages dependency versions. Every nested module resolves
-the parent through `../../pom.xml`. Libraries remain ordinary JARs; the Boot repackage goal
-runs only in the control-plane module. The obsolete root `src/` tree has been migrated.
+the parent through `../../pom.xml`. Libraries remain ordinary JARs. Worker publishes an
+additional executable `-exec.jar`, allowing its normal JAR to be reused by API integration
+tests without starting another application. Control-plane explicitly scans only its own
+API/configuration packages, so the Worker configuration cannot leak into the API process.
 
 ## Validation Boundary
 
@@ -41,14 +52,19 @@ do not depend on the repository working directory.
 
 ## Plan Alignment
 
-This checkpoint completes the contract skeleton portion of week 1, including executable tests.
-It does not complete all week-1 infrastructure tasks or the full MVP.
+The contract skeleton and the read-only portion of the week-2 Temporal milestone are implemented.
+The consultation workflow queries synthetic orders and classifies fixed scenarios through
+Activities. Refund/exchange/unclear requests complete with MANUAL_REQUIRED; they do not create
+approvals or execute side effects.
 
-The next planned execution milestone is a Temporal worker, a deterministic after-sales workflow,
-a Java Mock Provider, and the read-only query_order activity. Database persistence, approval
-signals, business policy evaluation, idempotent side effects, tracing export and evaluation
-commands remain future work.
+Real local execution uses the official Temporal dev server with a SQLite history file.
+Tests use TestWorkflowEnvironment, including deterministic replay, bounded Activity retry,
+terminal failures, and HTTP submission/result querying. See
+[Temporal development](temporal-development.md) and [verification](temporal-verification.md).
 
-Future Workflow code must remain deterministic; network, model and tool calls belong in Activities.
-Runtime delivery semantics will be at-least-once. Approval validity and idempotency at the
+PostgreSQL business persistence, approval signals, runtime Policy evaluation, idempotent side
+effects, tracing export, model integration and evaluation commands remain future work.
+
+Workflow code must remain deterministic; network, model and tool calls belong in Activities.
+Runtime delivery semantics are at-least-once. Approval validity and idempotency at the
 tool/database boundary must be implemented and tested before side effects are enabled.

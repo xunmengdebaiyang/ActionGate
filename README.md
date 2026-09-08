@@ -4,8 +4,11 @@ ActionGate 是一个面向高风险工具调用的 Agent 发布门禁与可恢�
 
 ## 当前状态
 
-当前版本为 **MVP 契约骨架**，采用 Java 21、Spring Boot 3 和 Maven 多模块结构：
+当前版本已完成 **契约骨架与 Temporal 咨询基础链路**，采用 Java 21、Spring Boot 3 和 Maven 多模块结构：
 
+- 通过 `POST /api/v1/runs` 提交合成工单，使用 `GET /api/v1/runs/{run_id}` 查询 Temporal 状态和结果。
+- Java Worker 执行只读订单查询与固定场景 Mock 分类。咨询返回订单状态；退款、换货和信息不足请求返回 `MANUAL_REQUIRED`。
+- Temporal 官方本地开发服务通过 SQLite 文件保存执行历史，无需 Docker。
 - Workflow、Tool、Policy 使用 Draft 2020-12 JSON Schema，通过 networknt 校验器验证。
 - 工作流校验节点唯一性、入口、跳转引用、可达性和无环结构；支持关联工具目录校验。
 - Tool 契约及实际参数均可校验，副作用工具必须声明必填、非空的幂等键。
@@ -13,28 +16,42 @@ ActionGate 是一个面向高风险工具调用的 Agent 发布门禁与可恢�
 - Java records 表达工作流版本、工具、策略、运行、审批、审计事件、评测案例和发布决策。
 - 控制面提供状态接口和 Actuator 健康检查。
 
-**本轮没有实现工作流执行或策略求值。** Schema 合法不代表动作获准执行；审批有效性、退款金额与订单金额比较、订单状态检查、实际幂等副作用、Temporal、数据库、模型调用和评测 CLI 均属于后续阶段。
+**当前只执行咨询工作流，没有退款或换货副作用。** Schema 合法不代表动作获准执行；运行时 Policy 求值、人工审批、退款金额与订单金额比较、实际幂等副作用、PostgreSQL 业务持久化、真实模型调用和评测 CLI 均属于后续阶段。
 
 ## 快速开始
 
 需要 JDK 21，设置 `JAVA_HOME` 并将其 `bin` 加入 `PATH`。仓库包含 Maven Wrapper，自动下载并校验 Maven 3.9.11，无需单独安装 Maven。
 
-Windows PowerShell，在仓库根目录执行：
+Windows PowerShell，在仓库根目录构建：
 
 ```powershell
 .\mvnw.cmd -B -ntp clean verify
-java -jar apps/control-plane/target/control-plane-0.2.0-SNAPSHOT.jar
 ```
 
 Linux / macOS：
 
 ```bash
 ./mvnw -B -ntp clean verify
+```
+
+真实运行需安装 [Temporal CLI](https://github.com/temporalio/cli/releases/tag/v1.8.3)，然后在三个终端分别执行：
+
+```powershell
+# 终端 1；temporal 不在 PATH 时，使用 -TemporalCommand 指定 temporal.exe
+.\scripts\start-temporal.ps1
+
+# 终端 2
+java -jar apps/worker/target/worker-0.2.0-SNAPSHOT-exec.jar
+
+# 终端 3
 java -jar apps/control-plane/target/control-plane-0.2.0-SNAPSHOT.jar
 ```
 
+服务启动后执行 `.\scripts\smoke.ps1`，验证六个合成工单场景。详细输入、返回值和 Linux 启动命令见 [Temporal 开发指南](docs/temporal-development.md)。
+
 状态接口：[http://localhost:8080/api/v1/status](http://localhost:8080/api/v1/status)；
-健康检查：[http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)。
+健康检查：[http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)；
+Temporal UI：[http://localhost:8233](http://localhost:8233)。
 
 默认端口被占用时，启动命令追加 `--server.port=8081`。在终端按 Ctrl+C 停止服务。
 
@@ -60,23 +77,26 @@ MVP 只支持售后咨询、换货、退款和人工处理四类意图。项目�
 ## 仓库结构
 
 ```text
-apps/control-plane/     Spring Boot API and health endpoints
+apps/control-plane/     Submission, result query and health endpoints
+apps/worker/            Temporal Worker and read-only mock Activities
 libs/contract-core/     JSON Schema validation, workflow and tool contracts
 libs/policy-contract/   Policy contracts and evaluation data records
 libs/trace-contract/    AgentRun, Approval and RunEvent
+libs/workflow-contract/ Temporal interfaces and synthetic ticket/result contracts
 tools/                 Three versioned after-sales ToolSpec examples
 workflows/             After-sales workflow example
 policies/              Four-rule after-sales safety policy
 docs/                  Architecture, contracts and verification notes
+scripts/               Temporal startup and end-to-end smoke checks
 ```
 
 Schema 随各模块 JAR 发布，位于 `src/main/resources/schemas/*.schema.json`；示例文件放在顶层 `tools/`、`workflows/`、`policies/`。测试直接读取这些示例，避免文档与测试各维护一套不同样本。
 
-契约说明见 [docs/contracts.md](docs/contracts.md)，模块边界见 [docs/architecture.md](docs/architecture.md)，本轮验证记录见 [docs/verification.md](docs/verification.md)。
+契约说明见 [docs/contracts.md](docs/contracts.md)，模块边界见 [docs/architecture.md](docs/architecture.md)，上一轮契约验证记录见 [docs/verification.md](docs/verification.md)。
 
 ## 验证
 
-`clean verify` 编译所有模块、执行契约与真实 HTTP 测试，并生成可运行的控制面 JAR。测试报告位于各模块 `target/surefire-reports/`。GitHub Actions 配置了 Java 21 的 Windows / Linux 构建。
+`clean verify` 编译所有模块，执行契约、Temporal 工作流和真实 HTTP 测试，并生成控制面及 Worker JAR。Maven 测试使用 Temporal 测试环境，不依赖外部服务器或 CLI；真实服务验证见 [本轮运行记录](docs/temporal-verification.md)。测试报告位于各模块 `target/surefire-reports/`。GitHub Actions 配置了 Java 21 的 Windows / Linux 构建。
 
 示例工单与工具均面向合成售后数据；不要提交生产凭据或真实客户数据。
 
