@@ -19,6 +19,7 @@ public final class ContractJson {
             .serializationInclusion(JsonInclude.Include.NON_NULL)
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+            .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
             .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
             .build();
 

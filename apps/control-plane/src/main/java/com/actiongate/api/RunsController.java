@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,8 +24,9 @@ public class RunsController {
     }
 
     @PostMapping(consumes = "application/json")
-    public ResponseEntity<RunView> start(@RequestBody String json) {
-        RunView run = runs.start(TicketValidator.parseAndValidate(json));
+    public ResponseEntity<RunView> start(@RequestBody String json,
+                                       @RequestHeader(name = "Idempotency-Key", required = false) String key) {
+        RunView run = runs.start(TicketValidator.parseAndValidate(json), key);
         return ResponseEntity.accepted().location(URI.create("/api/v1/runs/" + run.runId())).body(run);
     }
 

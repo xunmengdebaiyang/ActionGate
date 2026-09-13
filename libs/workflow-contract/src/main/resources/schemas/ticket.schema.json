@@ -4,7 +4,7 @@
   "additionalProperties": false,
   "required": ["scenario"],
   "properties": {
-    "order_id": {"type": ["string", "null"], "pattern": "^[0-9]{1,12}$"},
+    "order_id": {"type": ["string", "null"], "pattern": "^[0-9]{1,12}(?![\\s\\S])"},
     "scenario": {"enum": ["ORDER_STATUS", "REFUND_REQUEST", "EXCHANGE_REQUEST", "INSUFFICIENT_INFORMATION"]}
   }
 }

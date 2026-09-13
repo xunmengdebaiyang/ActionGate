@@ -79,6 +79,15 @@ class RunsApiTest {
         assertEquals("INVALID_TICKET", response.getBody().path("code").asText());
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"\\n", "\\r", "\\r\\n", "\\u0085", "\\u2028", "\\u2029"})
+    void rejectsLineTerminatorsInOrderIdsBeforeSubmission(String suffix) {
+        var response = http.postForEntity("/api/v1/runs",
+                body("{\"scenario\":\"ORDER_STATUS\",\"order_id\":\"10001" + suffix + "\"}"), JsonNode.class);
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("INVALID_TICKET", response.getBody().path("code").asText());
+    }
+
     @Test
     void missingRunAndInvalidRunIdHaveDistinctClientErrors() {
         assertEquals(404, http.getForEntity("/api/v1/runs/" + UUID.randomUUID(), JsonNode.class).getStatusCode().value());

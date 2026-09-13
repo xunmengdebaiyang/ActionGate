@@ -58,7 +58,8 @@ Activities. Refund/exchange/unclear requests complete with MANUAL_REQUIRED; they
 approvals or execute side effects.
 
 Real local execution uses the official Temporal dev server with a SQLite history file.
-Tests use TestWorkflowEnvironment, including deterministic replay, bounded Activity retry,
+Tests use TestWorkflowEnvironment, including deterministic replay, fixed released-history replay,
+bounded Activity retry,
 terminal failures, and HTTP submission/result querying. See
 [Temporal development](temporal-development.md) and [verification](temporal-verification.md).
 

@@ -1,6 +1,7 @@
 package com.actiongate.contract;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -123,6 +124,22 @@ class ContractTest {
                 "{\"order_id\":\"10001\",\"amount\":20.50,\"idempotency_key\":\"refund-001\"}");
         assertEquals(20.50, result.path("amount").asDouble());
         assertTrue(tool.inputSchema().has("required"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0.01", "20.50", "9007199254740992.01"})
+    void preservesExactDecimalArguments(String amount) throws IOException {
+        var tool = ToolValidator.compile(ToolValidator.parseAndValidate(refund().toString()));
+        var result = tool.validateArguments("{\"order_id\":\"10001\",\"amount\":" + amount
+                + ",\"idempotency_key\":\"exact\"}");
+        assertEquals(0, new BigDecimal(amount).compareTo(result.path("amount").decimalValue()));
+    }
+
+    @Test
+    void rejectsAmountJustBelowTheMinimumWithoutRoundingItUp() throws IOException {
+        var tool = ToolValidator.compile(ToolValidator.parseAndValidate(refund().toString()));
+        assertThrows(ContractViolationException.class, () -> tool.validateArguments(
+                "{\"order_id\":\"10001\",\"amount\":0.0099999999999999999,\"idempotency_key\":\"exact\"}"));
     }
 
     @ParameterizedTest

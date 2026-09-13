@@ -88,6 +88,13 @@ POST `/api/v1/runs` accepts exactly:
 {"order_id": "10001", "scenario": "ORDER_STATUS"}
 ```
 
+Clients may send an `Idempotency-Key` header containing 1-128 ASCII letters, digits,
+periods, underscores or hyphens. Repeating the same key with the same validated ticket
+returns the original run, including after the control plane restarts. Reusing a key with
+different ticket content returns HTTP 409. Requests without the header keep the original
+fresh-run behavior. The key fingerprint is stored in Temporal memo metadata; it is not a
+business database or a substitute for idempotency at a future side-effect tool boundary.
+
 `scenario` is required; `order_id` may be omitted or null. Non-null order IDs must contain
 1-12 digits. Unknown fields, unknown scenarios, duplicate keys, malformed JSON and numeric
 order IDs are rejected before Temporal submission. The input limit is 4096 characters.
@@ -117,9 +124,11 @@ Activity stack traces. Cancellation is observable but no cancellation API is pro
 - HTTP 404: execution not found for this workflow type.
 - HTTP 503: Temporal unavailable or an operation/result could not be confirmed.
 
-Every successful POST creates a fresh execution. Submission deduplication is not implemented;
-a transport timeout may happen after acceptance, so HTTP 503 does not prove that no run was
-created. This milestone has no financial side effects.
+Submission has a five-second overall Temporal request deadline by default, configurable with
+`ACTIONGATE_TEMPORAL_REQUEST_TIMEOUT` up to one minute. The deadline covers connection setup,
+RPC retries and result lookup. A transport timeout may happen after acceptance, so HTTP 503 does
+not prove that no run was created; retry with the same `Idempotency-Key` to recover the receipt.
+This milestone has no financial side effects.
 
 ## Execution Boundaries
 
@@ -152,6 +161,7 @@ idempotent side effects remain future milestones.
 | ACTIONGATE_TEMPORAL_TARGET | 127.0.0.1:7233 |
 | ACTIONGATE_TEMPORAL_NAMESPACE | default |
 | ACTIONGATE_TEMPORAL_TASK_QUEUE | actiongate-after-sales-consultation-v1 |
+| ACTIONGATE_TEMPORAL_REQUEST_TIMEOUT | 5s (maximum 1m) |
 | ACTIONGATE_API_PORT | 8080 |
 | ACTIONGATE_WORKER_PORT | 8082 |
 | ACTIONGATE_BIND_ADDRESS | 127.0.0.1 |
@@ -161,4 +171,6 @@ before starting either service. The dev script supports custom `-Port` and `-UiP
 
 Stop services with Ctrl+C in their terminals. Keep the SQLite database to preserve histories.
 Do not modify Workflow v1 behavior in place after storing histories without a compatible
-Temporal versioning/migration strategy and replay tests.
+Temporal versioning/migration strategy and replay tests. Released V1 histories are checked in
+under `apps/worker/src/test/resources/history/`; CI replays each fixed history and includes a
+deliberately incompatible workflow test that must fail replay.

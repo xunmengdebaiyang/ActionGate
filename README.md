@@ -47,7 +47,7 @@ java -jar apps/worker/target/worker-0.2.0-SNAPSHOT-exec.jar
 java -jar apps/control-plane/target/control-plane-0.2.0-SNAPSHOT.jar
 ```
 
-服务启动后执行 `.\scripts\smoke.ps1`，验证六个合成工单场景。详细输入、返回值和 Linux 启动命令见 [Temporal 开发指南](docs/temporal-development.md)。
+服务启动后执行 `.\scripts\smoke.ps1`，验证六个合成工单场景。提交请求可使用 `Idempotency-Key` 请求头进行安全重试；详细输入、返回值、幂等规则和 Linux 启动命令见 [Temporal 开发指南](docs/temporal-development.md)。
 
 状态接口：[http://localhost:8080/api/v1/status](http://localhost:8080/api/v1/status)；
 健康检查：[http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)；
@@ -96,7 +96,7 @@ Schema 随各模块 JAR 发布，位于 `src/main/resources/schemas/*.schema.jso
 
 ## 验证
 
-`clean verify` 编译所有模块，执行契约、Temporal 工作流和真实 HTTP 测试，并生成控制面及 Worker JAR。Maven 测试使用 Temporal 测试环境，不依赖外部服务器或 CLI；真实服务验证见 [本轮运行记录](docs/temporal-verification.md)。测试报告位于各模块 `target/surefire-reports/`。GitHub Actions 配置了 Java 21 的 Windows / Linux 构建。
+`clean verify` 编译所有模块，执行契约、Temporal 工作流、固定历史回放和真实 HTTP 测试，并生成控制面及 Worker JAR。Maven 测试使用 Temporal 测试环境，不依赖外部服务器或 CLI；真实服务验证见 [本轮运行记录](docs/temporal-verification.md)。测试报告位于各模块 `target/surefire-reports/`。GitHub Actions 配置了 Java 21 的 Windows / Linux 构建。
 
 示例工单与工具均面向合成售后数据；不要提交生产凭据或真实客户数据。
 

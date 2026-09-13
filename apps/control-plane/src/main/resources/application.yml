@@ -12,6 +12,7 @@ actiongate:
     target: ${ACTIONGATE_TEMPORAL_TARGET:127.0.0.1:7233}
     namespace: ${ACTIONGATE_TEMPORAL_NAMESPACE:default}
     task-queue: ${ACTIONGATE_TEMPORAL_TASK_QUEUE:actiongate-after-sales-consultation-v1}
+    request-timeout: ${ACTIONGATE_TEMPORAL_REQUEST_TIMEOUT:5s}
 management:
   endpoints:
     web:

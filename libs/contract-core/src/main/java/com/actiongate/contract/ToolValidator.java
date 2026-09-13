@@ -32,12 +32,30 @@ public final class ToolValidator {
     }
 
     public static JsonNode validateArguments(ToolSpec tool, String arguments) {
-        // Revalidate records supplied by callers, not only records loaded by this validator.
+        return compile(tool).validateArguments(arguments);
+    }
+
+    public static CompiledTool compile(ToolSpec tool) {
+        // Directly constructed records must pass the same registration checks as JSON inputs.
         ToolSpec validated = parseAndValidate(ContractJson.tree(tool).toString());
-        JsonNode result = SchemaValidator.toolInput(validated).validate(arguments);
-        if (validated.sideEffectLevel() == ToolSpec.SideEffectLevel.SIDE_EFFECT) {
-            require(!result.path("idempotency_key").asText().isBlank(), "idempotency_key must not be blank");
+        return new CompiledTool(validated, SchemaValidator.toolInput(validated));
+    }
+
+    public static final class CompiledTool {
+        private final ToolSpec tool;
+        private final SchemaValidator input;
+
+        private CompiledTool(ToolSpec tool, SchemaValidator input) {
+            this.tool = tool;
+            this.input = input;
         }
-        return result;
+
+        public JsonNode validateArguments(String arguments) {
+            JsonNode result = input.validate(arguments);
+            if (tool.sideEffectLevel() == ToolSpec.SideEffectLevel.SIDE_EFFECT) {
+                require(!result.path("idempotency_key").asText().isBlank(), "idempotency_key must not be blank");
+            }
+            return result;
+        }
     }
 }

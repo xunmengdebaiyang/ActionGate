@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -18,7 +19,7 @@ class TemporalUnavailableTest {
     @Test
     void reportsDependencyFailureWithoutLeakingGrpcDetailsOrPretendingSuccess() throws Exception {
         var service = mock(RunsService.class);
-        when(service.start(any())).thenThrow(Status.UNAVAILABLE.withDescription("internal connection details").asRuntimeException());
+        when(service.start(any(), isNull())).thenThrow(Status.UNAVAILABLE.withDescription("internal connection details").asRuntimeException());
         var http = MockMvcBuilders.standaloneSetup(new RunsController(service))
                 .setControllerAdvice(new ApiExceptionHandler()).build();
         http.perform(post("/api/v1/runs").contentType(MediaType.APPLICATION_JSON)
