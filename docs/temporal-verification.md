@@ -18,6 +18,7 @@ All seven reactor projects passed. Test totals:
 | Suite | Tests | Failures / errors / skipped |
 | --- | ---: | --- |
 | ContractTest | 51 | 0 / 0 / 0 |
+| CompiledToolTest | 4 | 0 / 0 / 0 |
 | PolicyValidatorTest | 29 | 0 / 0 / 0 |
 | RunEventTest | 3 | 0 / 0 / 0 |
 | AfterSalesWorkflowTest | 12 | 0 / 0 / 0 |
