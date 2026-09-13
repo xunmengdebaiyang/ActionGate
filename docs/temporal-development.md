@@ -3,9 +3,9 @@
 ## Scope and Prerequisites
 
 This milestone runs a compiled Java workflow through a real Temporal service. Inputs are
-synthetic scenario identifiers, not free-form customer text. Only two Activities are registered:
-`ActionGateQueryOrderV1` and `ActionGateMockClassifyV1`. No refund, exchange, payment, approval
-or external model calls are implemented.
+synthetic scenario identifiers, not free-form customer text. The worker registers read-only
+lookup/classification Activities plus Mock `create_refund` and `create_exchange` Activities.
+The latter are guarded by the bundled Policy and never call a real order or payment system.
 
 Use JDK 21 and the repository Maven Wrapper. Real local execution also needs the official
 [Temporal CLI 1.8.3](https://github.com/temporalio/cli/releases/tag/v1.8.3).
@@ -82,11 +82,23 @@ Run `.\scripts\smoke.ps1` to exercise six synthetic cases against the real local
 
 ## API Contract
 
-POST `/api/v1/runs` accepts exactly:
+POST `/api/v1/runs` accepts a ticket with optional action fields:
 
 ```json
 {"order_id": "10001", "scenario": "ORDER_STATUS"}
 ```
+
+An approved refund can be submitted with `amount`, `idempotency_key` and
+`approval_status: "APPROVED"`:
+
+```json
+{"order_id":"10001","scenario":"REFUND_REQUEST","amount":50.00,
+ "idempotency_key":"refund-10001-1","approval_status":"APPROVED"}
+```
+
+An exchange uses `sku` and `idempotency_key`. Action fields are optional for compatibility;
+an action scenario without its required fields remains a manual result. Amounts are checked
+against the synthetic order total at the runtime Policy boundary.
 
 Clients may send an `Idempotency-Key` header containing 1-128 ASCII letters, digits,
 periods, underscores or hyphens. Repeating the same key with the same validated ticket
@@ -105,6 +117,11 @@ Free-form message fields are deliberately unsupported in this mock milestone.
 | ORDER_STATUS with known order | ANSWERED | CONSULTATION_ANSWERED |
 | REFUND_REQUEST with known order | MANUAL_REQUIRED | REFUND_REQUIRES_HUMAN |
 | EXCHANGE_REQUEST with known order | MANUAL_REQUIRED | EXCHANGE_REQUIRES_HUMAN |
+| Approved refund within order amount | ACTION_EXECUTED | REFUND_EXECUTED |
+| Valid exchange with a new idempotency key | ACTION_EXECUTED | EXCHANGE_EXECUTED |
+| Repeated action idempotency key | ACTION_REPLAYED | IDEMPOTENT_REPLAY |
+| Refund without approval | MANUAL_REQUIRED | APPROVAL_REQUIRED |
+| Refund above order amount | MANUAL_REQUIRED | POLICY_BLOCKED |
 | INSUFFICIENT_INFORMATION with known order | MANUAL_REQUIRED | INSUFFICIENT_INFORMATION |
 | Missing order ID | MANUAL_REQUIRED | MISSING_ORDER_ID |
 | Unknown order ID | MANUAL_REQUIRED | ORDER_NOT_FOUND |
@@ -114,7 +131,8 @@ The mock catalog has `10001` (SHIPPED, CNY 199.00) and `10002`
 Order lookup precedes classification, so missing/unknown-order reasons take precedence.
 
 MANUAL_REQUIRED is a completed workflow result requiring future human handling; it does
-not create a pending approval or wait for a person. The workflow has no side-effect tools.
+not create a pending approval or wait for a person. For a refund lacking approval or exceeding
+the order amount, the policy-gated Activity returns this result without calling the Mock Provider.
 
 GET `/api/v1/runs/{uuid}` reports RUNNING, COMPLETED, FAILED, TIMED_OUT, CANCELLED,
 TERMINATED or CONTINUED_AS_NEW. Failure responses expose stable error codes without raw
@@ -150,9 +168,11 @@ at two seconds. Explicit non-retryable failures stop immediately. Invalid Activi
 results produce terminal workflow failures rather than endlessly failing Workflow Tasks.
 API-created executions have a five-minute execution timeout, including time waiting for a Worker.
 
-No runtime Policy evaluator is wired yet. Refund and exchange are withheld by the compiled
-read-only workflow. Approval validity, refund amount limits, business audit persistence and
-idempotent side effects remain future milestones.
+The runtime Policy evaluator is wired at the side-effect Activity boundary. It evaluates the
+active bundled policy before the Mock Provider is called. Refund approval, order amount limits,
+and idempotency-key presence are enforced; violations return a completed manual result and do
+not execute the provider. The in-process Mock Provider deduplicates by tool and idempotency key.
+Durable business persistence and integration with real side-effect systems remain future work.
 
 ## Configuration
 

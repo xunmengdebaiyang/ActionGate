@@ -5,6 +5,10 @@
   "required": ["scenario"],
   "properties": {
     "order_id": {"type": ["string", "null"], "pattern": "^[0-9]{1,12}(?![\\s\\S])"},
-    "scenario": {"enum": ["ORDER_STATUS", "REFUND_REQUEST", "EXCHANGE_REQUEST", "INSUFFICIENT_INFORMATION"]}
+    "scenario": {"enum": ["ORDER_STATUS", "REFUND_REQUEST", "EXCHANGE_REQUEST", "INSUFFICIENT_INFORMATION"]},
+    "amount": {"type": "number", "minimum": 0.01},
+    "sku": {"type": "string", "minLength": 1},
+    "idempotency_key": {"type": "string", "minLength": 1},
+    "approval_status": {"enum": ["PENDING", "APPROVED", "REJECTED"]}
   }
 }

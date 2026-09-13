@@ -8,7 +8,7 @@ public record RunResult(Outcome outcome, Intent intent, Reason reason, String re
     public static final VersionReference PROVIDER = new VersionReference("mock-scenarios", "1.0.0");
 
     public enum Outcome {
-        ANSWERED, MANUAL_REQUIRED
+        ANSWERED, ACTION_EXECUTED, ACTION_REPLAYED, MANUAL_REQUIRED
     }
 
     public enum Intent {
@@ -17,6 +17,7 @@ public record RunResult(Outcome outcome, Intent intent, Reason reason, String re
 
     public enum Reason {
         CONSULTATION_ANSWERED, REFUND_REQUIRES_HUMAN, EXCHANGE_REQUIRES_HUMAN,
-        MISSING_ORDER_ID, ORDER_NOT_FOUND, INSUFFICIENT_INFORMATION
+        REFUND_EXECUTED, EXCHANGE_EXECUTED, IDEMPOTENT_REPLAY, APPROVAL_REQUIRED,
+        POLICY_BLOCKED, MISSING_ORDER_ID, ORDER_NOT_FOUND, INSUFFICIENT_INFORMATION
     }
 }

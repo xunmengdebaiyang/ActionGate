@@ -3,23 +3,35 @@ package com.actiongate.worker;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.actiongate.contract.ContractJson;
 import com.actiongate.contract.ContractViolationException;
 import com.actiongate.contract.ToolValidator;
+import com.actiongate.policy.PolicyDecision;
+import com.actiongate.policy.PolicyDocument;
+import com.actiongate.policy.PolicyEvaluationContext;
+import com.actiongate.policy.PolicyEvaluator;
+import com.actiongate.policy.PolicyValidator;
+import com.actiongate.workflow.ActionResult;
+import com.actiongate.workflow.AfterSalesActionActivities;
 import com.actiongate.workflow.AfterSalesActivities;
 import com.actiongate.workflow.OrderLookup;
 import com.actiongate.workflow.OrderSummary;
 import com.actiongate.workflow.RunResult.Intent;
+import com.actiongate.workflow.TicketInput;
 import com.actiongate.workflow.TicketInput.Scenario;
 import io.temporal.failure.ApplicationFailure;
 
-public final class LocalAfterSalesActivities implements AfterSalesActivities {
+public final class LocalAfterSalesActivities implements AfterSalesActivities, AfterSalesActionActivities {
     private static final Map<String, OrderSummary> ORDERS = Map.of(
             "10001", new OrderSummary("10001", new BigDecimal("199.00"), "CNY", OrderSummary.Status.SHIPPED),
             "10002", new OrderSummary("10002", new BigDecimal("89.90"), "CNY", OrderSummary.Status.PROCESSING));
     private final ToolValidator.CompiledTool queryOrder;
+    private final ToolValidator.CompiledTool createRefund;
+    private final ToolValidator.CompiledTool createExchange;
+    private final PolicyDocument policy;
     private final MockProvider provider = new MockProvider();
 
     public LocalAfterSalesActivities() {
@@ -32,6 +44,9 @@ public final class LocalAfterSalesActivities implements AfterSalesActivities {
         } catch (IOException exception) {
             throw new IllegalStateException("Cannot load query_order contract", exception);
         }
+        createRefund = loadTool("/tools/create_refund.json");
+        createExchange = loadTool("/tools/create_exchange.json");
+        policy = loadPolicy("/policies/after-sales-safety-v1.json");
     }
 
     @Override
@@ -54,5 +69,83 @@ public final class LocalAfterSalesActivities implements AfterSalesActivities {
             throw ApplicationFailure.newNonRetryableFailure("Scenario is required", "INVALID_PROVIDER_INPUT");
         }
         return provider.classify(scenario);
+    }
+
+    @Override
+    public ActionResult createRefund(String orderId, BigDecimal amount, BigDecimal orderAmount,
+                                     String idempotencyKey, TicketInput.ApprovalStatus approvalStatus) {
+        Map<String, Object> args = new LinkedHashMap<>();
+        args.put("order_id", orderId);
+        args.put("amount", amount);
+        args.put("idempotency_key", idempotencyKey);
+        validateArguments(createRefund, args, "refund");
+        PolicyDecision decision = PolicyEvaluator.evaluate(policy,
+                new PolicyEvaluationContext("create_refund", true, amount, orderAmount, idempotencyKey,
+                        approvalStatus == null ? "PENDING" : approvalStatus.name()));
+        if (!decision.allowed()) {
+            return blocked(decision, "create_refund", approvalStatus);
+        }
+        return provider.createRefund(orderId, amount, idempotencyKey);
+    }
+
+    @Override
+    public ActionResult createExchange(String orderId, String sku, BigDecimal orderAmount,
+                                       String idempotencyKey, TicketInput.ApprovalStatus approvalStatus) {
+        if (sku == null || sku.isBlank()) {
+            throw ApplicationFailure.newNonRetryableFailure("Invalid exchange arguments", "INVALID_TOOL_ARGUMENTS");
+        }
+        Map<String, Object> args = new LinkedHashMap<>();
+        args.put("order_id", orderId);
+        args.put("sku", sku);
+        args.put("idempotency_key", idempotencyKey);
+        validateArguments(createExchange, args, "exchange");
+        PolicyDecision decision = PolicyEvaluator.evaluate(policy,
+                new PolicyEvaluationContext("create_exchange", true, null, orderAmount, idempotencyKey,
+                        approvalStatus == null ? "PENDING" : approvalStatus.name()));
+        if (!decision.allowed()) {
+            return blocked(decision, "create_exchange", approvalStatus);
+        }
+        return provider.createExchange(orderId, sku, idempotencyKey);
+    }
+
+    private ActionResult blocked(PolicyDecision decision, String tool, TicketInput.ApprovalStatus approvalStatus) {
+        boolean approval = decision.violations().contains("refund-requires-approval")
+                && approvalStatus != TicketInput.ApprovalStatus.REJECTED;
+        return new ActionResult(approval ? ActionResult.Status.APPROVAL_REQUIRED : ActionResult.Status.REJECTED,
+                null, tool, approval ? "Approval is required before this action can execute."
+                        : "Action blocked by policy.", decision.violations());
+    }
+
+    private static void validateArguments(ToolValidator.CompiledTool tool, Map<String, Object> args,
+                                         String action) {
+        try {
+            tool.validateArguments(ContractJson.tree(args).toString());
+        } catch (ContractViolationException exception) {
+            throw ApplicationFailure.newNonRetryableFailure("Invalid " + action + " arguments",
+                    "INVALID_TOOL_ARGUMENTS");
+        }
+    }
+
+    private ToolValidator.CompiledTool loadTool(String resource) {
+        try (var input = getClass().getResourceAsStream(resource)) {
+            if (input == null) {
+                throw new IllegalStateException("Bundled tool contract is missing: " + resource);
+            }
+            return ToolValidator.compile(ToolValidator.parseAndValidate(
+                    new String(input.readAllBytes(), StandardCharsets.UTF_8)));
+        } catch (IOException exception) {
+            throw new IllegalStateException("Cannot load tool contract: " + resource, exception);
+        }
+    }
+
+    private PolicyDocument loadPolicy(String resource) {
+        try (var input = getClass().getResourceAsStream(resource)) {
+            if (input == null) {
+                throw new IllegalStateException("Bundled policy is missing: " + resource);
+            }
+            return PolicyValidator.parseAndValidate(new String(input.readAllBytes(), StandardCharsets.UTF_8));
+        } catch (IOException exception) {
+            throw new IllegalStateException("Cannot load policy: " + resource, exception);
+        }
     }
 }

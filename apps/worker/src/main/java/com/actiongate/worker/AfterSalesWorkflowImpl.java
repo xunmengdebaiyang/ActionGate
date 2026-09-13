@@ -3,7 +3,9 @@ package com.actiongate.worker;
 import java.time.Duration;
 
 import com.actiongate.workflow.AfterSalesActivities;
+import com.actiongate.workflow.AfterSalesActionActivities;
 import com.actiongate.workflow.AfterSalesWorkflow;
+import com.actiongate.workflow.ActionResult;
 import com.actiongate.workflow.OrderLookup;
 import com.actiongate.workflow.OrderSummary;
 import com.actiongate.workflow.RunResult;
@@ -18,6 +20,16 @@ import io.temporal.workflow.Workflow;
 
 public class AfterSalesWorkflowImpl implements AfterSalesWorkflow {
     private final AfterSalesActivities activities = Workflow.newActivityStub(AfterSalesActivities.class,
+            ActivityOptions.newBuilder()
+                    .setStartToCloseTimeout(Duration.ofSeconds(5))
+                    .setScheduleToCloseTimeout(Duration.ofSeconds(20))
+                    .setRetryOptions(RetryOptions.newBuilder()
+                            .setInitialInterval(Duration.ofSeconds(1))
+                            .setMaximumInterval(Duration.ofSeconds(2))
+                            .setMaximumAttempts(3)
+                    .build())
+                    .build());
+    private final AfterSalesActionActivities actionActivities = Workflow.newActivityStub(AfterSalesActionActivities.class,
             ActivityOptions.newBuilder()
                     .setStartToCloseTimeout(Duration.ofSeconds(5))
                     .setScheduleToCloseTimeout(Duration.ofSeconds(20))
@@ -59,15 +71,47 @@ public class AfterSalesWorkflowImpl implements AfterSalesWorkflow {
             case QUESTION -> new RunResult(Outcome.ANSWERED, intent, Reason.CONSULTATION_ANSWERED,
                     "Order " + order.orderId() + " is " + order.status() + ".", order,
                     RunResult.WORKFLOW, RunResult.PROVIDER);
-            case REFUND -> manual(intent, Reason.REFUND_REQUIRES_HUMAN, order);
-            case EXCHANGE -> manual(intent, Reason.EXCHANGE_REQUIRES_HUMAN, order);
+            case REFUND -> {
+                if (input.amount() == null || input.idempotencyKey() == null) {
+                    yield manual(intent, Reason.REFUND_REQUIRES_HUMAN, order);
+                }
+                yield actionResult(intent, order, actionActivities.createRefund(order.orderId(), input.amount(),
+                        order.amount(), input.idempotencyKey(), input.approvalStatus()));
+            }
+            case EXCHANGE -> {
+                if (input.sku() == null || input.idempotencyKey() == null) {
+                    yield manual(intent, Reason.EXCHANGE_REQUIRES_HUMAN, order);
+                }
+                yield actionResult(intent, order, actionActivities.createExchange(order.orderId(), input.sku(),
+                        order.amount(), input.idempotencyKey(), input.approvalStatus()));
+            }
             case MANUAL -> manual(intent, Reason.INSUFFICIENT_INFORMATION, order);
         };
     }
 
+    private RunResult actionResult(Intent intent, OrderSummary order, ActionResult action) {
+        if (action == null || action.status() == null) {
+            throw ApplicationFailure.newNonRetryableFailure("Invalid action result", "INVALID_ACTION_RESULT");
+        }
+        return switch (action.status()) {
+            case EXECUTED -> new RunResult(Outcome.ACTION_EXECUTED, intent,
+                    intent == Intent.REFUND ? Reason.REFUND_EXECUTED : Reason.EXCHANGE_EXECUTED,
+                    action.message(), order, RunResult.WORKFLOW, RunResult.PROVIDER);
+            case IDEMPOTENT_REPLAY -> new RunResult(Outcome.ACTION_REPLAYED, intent, Reason.IDEMPOTENT_REPLAY,
+                    action.message(), order, RunResult.WORKFLOW, RunResult.PROVIDER);
+            case APPROVAL_REQUIRED -> manual(intent, Reason.APPROVAL_REQUIRED, order, action.message());
+            case REJECTED -> manual(intent, Reason.POLICY_BLOCKED, order,
+                    action.message() + " Violations: " + String.join(",", action.policyViolations()));
+        };
+    }
+
     private RunResult manual(Intent intent, Reason reason, OrderSummary order) {
+        return manual(intent, reason, order, "Human review is required. No refund or exchange was executed.");
+    }
+
+    private RunResult manual(Intent intent, Reason reason, OrderSummary order, String reply) {
         return new RunResult(Outcome.MANUAL_REQUIRED, intent, reason,
-                "Human review is required. No refund or exchange was executed.", order,
+                reply, order,
                 RunResult.WORKFLOW, RunResult.PROVIDER);
     }
 }

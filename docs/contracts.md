@@ -88,8 +88,11 @@ An assertion is exactly one of:
 - `always: false`.
 
 All initial rules use BLOCK on violation. Unknown operators and mixed condition/assertion
-forms are rejected. `PolicyValidator.parseAndValidate` validates syntax and rule IDs;
-it does not evaluate the assertions, inspect approvals, or authorize actions.
+forms are rejected. `PolicyValidator.parseAndValidate` validates syntax and rule IDs.
+`PolicyEvaluator` evaluates the active policy at the side-effect Activity boundary using a
+bounded context containing the tool, side-effect level, amount/order amount, idempotency key
+and approval status. A decision contains an immutable violation list; any violation blocks
+the action.
 
 ## Runtime and Evaluation Data Records
 

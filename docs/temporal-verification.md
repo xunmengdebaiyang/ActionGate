@@ -5,7 +5,7 @@ Baseline: `9754723d2dd9595617a432c60394117192478995`
 
 ## Automated Build
 
-Executed in the standalone `C:\ActionGate` checkout with Maven Wrapper 3.9.11,
+Executed in the `C:\Users\xunmengdebaiyang\Documents\ChatGPT\ActionGate` checkout with Maven Wrapper 3.9.11,
 Temporal Java SDK/testing 1.38.0 and a local JDK 24.0.2 runtime. GitHub Actions keeps
 the supported JDK 21 Windows/Linux matrix:
 
@@ -20,14 +20,17 @@ All seven reactor projects passed. Test totals:
 | ContractTest | 51 | 0 / 0 / 0 |
 | CompiledToolTest | 4 | 0 / 0 / 0 |
 | PolicyValidatorTest | 29 | 0 / 0 / 0 |
+| PolicyEvaluatorTest | 3 | 0 / 0 / 0 |
 | RunEventTest | 3 | 0 / 0 / 0 |
+| TicketValidatorTest | 2 | 0 / 0 / 0 |
+| AfterSalesActionWorkflowTest | 4 | 0 / 0 / 0 |
 | AfterSalesWorkflowTest | 12 | 0 / 0 / 0 |
 | WorkflowCompatibilityTest | 7 | 0 / 0 / 0 |
 | ControlPlaneTest | 2 | 0 / 0 / 0 |
 | RunsApiTest | 23 | 0 / 0 / 0 |
 | SubmissionIdempotencyTest | 10 | 0 / 0 / 0 |
 | TemporalUnavailableTest | 1 | 0 / 0 / 0 |
-| Total | 147 | 0 / 0 / 0 |
+| Total | 156 | 0 / 0 / 0 |
 
 New checks include consultation answers, manual outcomes, missing/unknown orders,
 bounded transient retries, exhausted and non-retryable failures, invalid Activity/provider
@@ -36,9 +39,10 @@ repeated and concurrent HTTP submission, exact decimal argument handling, line-t
 rejection, result lookup, pending/timeout/failure statuses, malformed requests, unknown
 executions and sanitized dependency errors.
 
-Workflow replay consumed recorded history without executing Activities again. Tests inspect
-Activity scheduling history for refund/exchange requests and observe only the read-only
-query and mock classification Activity types. No side-effect handlers are registered.
+Workflow replay consumed recorded history without executing Activities again. Action tests cover
+approved refund execution, approval and amount-policy blocks, exchange execution and repeated
+idempotency-key replay. Released V1 histories still replay with the original read-only Activity
+sequence.
 
 The API tests use real HTTP and a Temporal test service with the actual Worker implementation.
 Only the unavailable-dependency error mapping test uses a mocked service.

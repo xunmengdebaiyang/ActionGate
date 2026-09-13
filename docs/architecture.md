@@ -16,13 +16,14 @@ worker
 
 - `contract-core`: strict JSON parsing, bundled JSON Schema validation, WorkflowDefinition,
   WorkflowVersion, VersionReference and ToolSpec. Owns workflow graph validation and tool argument validation.
-- `policy-contract`: the versioned Policy grammar, duplicate-rule checks, and immutable EvaluationCase
-  and ReleaseDecision data records. It has no Spring dependency and performs no policy evaluation.
+- `policy-contract`: the versioned Policy grammar, duplicate-rule checks, immutable EvaluationCase
+  and ReleaseDecision data records, and the small runtime PolicyEvaluator. It has no Spring dependency.
 - `trace-contract`: AgentRun, Approval and RunEvent data records with version and trace correlation.
   No persistence, tracing exporter, or execution state machine is installed.
 - `workflow-contract`: versioned Temporal Workflow/Activity interfaces, synthetic ticket schema,
   and bounded input/result records. Does not depend on either application.
-- `worker`: compiled consultation workflow, Mock Provider and read-only order Activity;
+- `worker`: compiled consultation workflow, Mock Provider, read-only order Activity and policy-gated
+  refund/exchange Activities;
   Spring Boot process with Temporal namespace health.
 - `control-plane`: Spring Boot submission/query API. Uses Temporal for execution state and
   results, with no local run registry.
@@ -52,10 +53,11 @@ do not depend on the repository working directory.
 
 ## Plan Alignment
 
-The contract skeleton and the read-only portion of the week-2 Temporal milestone are implemented.
-The consultation workflow queries synthetic orders and classifies fixed scenarios through
-Activities. Refund/exchange/unclear requests complete with MANUAL_REQUIRED; they do not create
-approvals or execute side effects.
+The contract skeleton, read-only consultation path and week-3 policy-gated Mock side-effect path
+are implemented. The consultation workflow queries synthetic orders and classifies fixed scenarios
+through Activities. Action requests with complete fields call Mock refund/exchange Activities only
+after policy evaluation; missing approval, excessive refund amounts and missing idempotency keys
+complete with a manual result.
 
 Real local execution uses the official Temporal dev server with a SQLite history file.
 Tests use TestWorkflowEnvironment, including deterministic replay, fixed released-history replay,
@@ -63,9 +65,9 @@ bounded Activity retry,
 terminal failures, and HTTP submission/result querying. See
 [Temporal development](temporal-development.md) and [verification](temporal-verification.md).
 
-PostgreSQL business persistence, approval signals, runtime Policy evaluation, idempotent side
-effects, tracing export, model integration and evaluation commands remain future work.
+PostgreSQL business persistence, durable approval signals, real side-effect adapters, tracing export,
+model integration and evaluation commands remain future work.
 
 Workflow code must remain deterministic; network, model and tool calls belong in Activities.
 Runtime delivery semantics are at-least-once. Approval validity and idempotency at the
-tool/database boundary must be implemented and tested before side effects are enabled.
+tool/database boundary must be implemented before connecting production side effects.

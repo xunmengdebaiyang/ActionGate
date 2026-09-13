@@ -16,6 +16,10 @@
       <artifactId>workflow-contract</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.actiongate</groupId>
+      <artifactId>policy-contract</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
@@ -42,7 +46,16 @@
       <resource>
         <directory>../../tools</directory>
         <targetPath>tools</targetPath>
-        <includes><include>query_order.json</include></includes>
+        <includes>
+          <include>query_order.json</include>
+          <include>create_refund.json</include>
+          <include>create_exchange.json</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>../../policies</directory>
+        <targetPath>policies</targetPath>
+        <includes><include>after-sales-safety-v1.json</include></includes>
       </resource>
     </resources>
     <plugins>
