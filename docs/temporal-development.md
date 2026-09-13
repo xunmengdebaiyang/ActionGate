@@ -13,8 +13,9 @@ It embeds Temporal Server 1.31.2 and a development UI. The SDK and testing libra
 to 1.38.0. Maven tests use TestWorkflowEnvironment and do not need the CLI, Docker or a server.
 
 The dev server uses a SQLite file. This is local Temporal history storage, not a replacement
-for the planned PostgreSQL business database. No production credentials are needed.
-All services bind to loopback by default and have no production authentication setup.
+for the PostgreSQL business database used by the Worker for action idempotency. The control plane
+requires API keys by default; local tests explicitly disable that protection. All services bind
+to loopback by default.
 
 ## Start Locally
 
@@ -88,13 +89,19 @@ POST `/api/v1/runs` accepts a ticket with optional action fields:
 {"order_id": "10001", "scenario": "ORDER_STATUS"}
 ```
 
-An approved refund can be submitted with `amount`, `idempotency_key` and
-`approval_status: "APPROVED"`:
+An action request contains no approval status. Submit the refund first, then send a separate
+Approval record to the run:
 
 ```json
 {"order_id":"10001","scenario":"REFUND_REQUEST","amount":50.00,
- "idempotency_key":"refund-10001-1","approval_status":"APPROVED"}
+ "idempotency_key":"refund-10001-1"}
 ```
+
+The approval endpoint is `POST /api/v1/runs/{run_id}/approval` and accepts `operator`,
+`decision`, `expires_at`, `tool_name` and a SHA-256 `request_hash`. For a refund,
+`request_hash` is the digest of the canonical action parameters. The workflow checks the run,
+tool, digest, decision and expiry before calling the action Activity; invalid or expired
+approvals complete with `MANUAL_REQUIRED`.
 
 An exchange uses `sku` and `idempotency_key`. Action fields are optional for compatibility;
 an action scenario without its required fields remains a manual result. Amounts are checked
@@ -104,8 +111,9 @@ Clients may send an `Idempotency-Key` header containing 1-128 ASCII letters, dig
 periods, underscores or hyphens. Repeating the same key with the same validated ticket
 returns the original run, including after the control plane restarts. Reusing a key with
 different ticket content returns HTTP 409. Requests without the header keep the original
-fresh-run behavior. The key fingerprint is stored in Temporal memo metadata; it is not a
-business database or a substitute for idempotency at a future side-effect tool boundary.
+fresh-run behavior. The key fingerprint is stored in Temporal memo metadata. Action-level
+idempotency records are stored in PostgreSQL and include the request digest, so reusing a key
+with different parameters returns a conflict instead of replaying the original action.
 
 `scenario` is required; `order_id` may be omitted or null. Non-null order IDs must contain
 1-12 digits. Unknown fields, unknown scenarios, duplicate keys, malformed JSON and numeric
@@ -171,8 +179,9 @@ API-created executions have a five-minute execution timeout, including time wait
 The runtime Policy evaluator is wired at the side-effect Activity boundary. It evaluates the
 active bundled policy before the Mock Provider is called. Refund approval, order amount limits,
 and idempotency-key presence are enforced; violations return a completed manual result and do
-not execute the provider. The in-process Mock Provider deduplicates by tool and idempotency key.
-Durable business persistence and integration with real side-effect systems remain future work.
+not execute the provider. The Mock Provider uses the PostgreSQL idempotency store in the Worker
+process. Tests use an in-memory store only when exercising the workflow without a database.
+Integration with real side-effect systems remains future work.
 
 ## Configuration
 
@@ -182,12 +191,26 @@ Durable business persistence and integration with real side-effect systems remai
 | ACTIONGATE_TEMPORAL_NAMESPACE | default |
 | ACTIONGATE_TEMPORAL_TASK_QUEUE | actiongate-after-sales-consultation-v1 |
 | ACTIONGATE_TEMPORAL_REQUEST_TIMEOUT | 5s (maximum 1m) |
+| ACTIONGATE_TEMPORAL_API_KEY | empty; requires TLS when set |
+| ACTIONGATE_TEMPORAL_TLS_ENABLED | false |
+| ACTIONGATE_TEMPORAL_TLS_TRUST_CERT_PATH | empty |
+| ACTIONGATE_TEMPORAL_TLS_SERVER_NAME | empty; optional TLS authority override |
+| ACTIONGATE_TEMPORAL_TLS_CLIENT_CERT_PATH | empty |
+| ACTIONGATE_TEMPORAL_TLS_CLIENT_KEY_PATH | empty |
+| ACTIONGATE_API_KEY | required when control-plane security is enabled |
+| ACTIONGATE_APPROVAL_API_KEY | required for approval requests |
+| ACTIONGATE_RATE_LIMIT_PER_MINUTE | 60 |
+| ACTIONGATE_MAX_BODY_BYTES | 4096 |
+| ACTIONGATE_DB_URL | jdbc:postgresql://127.0.0.1:5432/actiongate |
+| ACTIONGATE_DB_USERNAME | actiongate |
+| ACTIONGATE_DB_PASSWORD | empty |
 | ACTIONGATE_API_PORT | 8080 |
 | ACTIONGATE_WORKER_PORT | 8082 |
 | ACTIONGATE_BIND_ADDRESS | 127.0.0.1 |
 
 API and Worker must use the same target, namespace and task queue. Create a custom namespace
-before starting either service. The dev script supports custom `-Port` and `-UiPort`.
+before starting either service and provision the PostgreSQL database before starting the Worker.
+The dev script supports custom `-Port` and `-UiPort`.
 
 Stop services with Ctrl+C in their terminals. Keep the SQLite database to preserve histories.
 Do not modify Workflow v1 behavior in place after storing histories without a compatible

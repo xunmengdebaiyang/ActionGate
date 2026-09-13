@@ -7,7 +7,7 @@ ActionGate 是一个面向高风险工具调用的 Agent 发布门禁与可恢�
 当前版本已完成 **契约骨架、Temporal 咨询链路与第 3 周副作用工具闭环**，采用 Java 21、Spring Boot 3 和 Maven 多模块结构：
 
 - 通过 `POST /api/v1/runs` 提交合成工单，使用 `GET /api/v1/runs/{run_id}` 查询 Temporal 状态和结果。
-- Java Worker 执行订单查询、固定场景 Mock 分类，以及受策略控制的 Mock 退款/换货动作。退款需要审批且不得超过订单金额；所有副作用动作都需要幂等键。
+- Java Worker 执行订单查询、固定场景 Mock 分类，以及受策略控制的 Mock 退款/换货动作。退款需要独立的 Approval 信号且不得超过订单金额；所有副作用动作都需要幂等键。
 - Temporal 官方本地开发服务通过 SQLite 文件保存执行历史，无需 Docker。
 - Workflow、Tool、Policy 使用 Draft 2020-12 JSON Schema，通过 networknt 校验器验证。
 - 工作流校验节点唯一性、入口、跳转引用、可达性和无环结构；支持关联工具目录校验。
@@ -17,7 +17,7 @@ ActionGate 是一个面向高风险工具调用的 Agent 发布门禁与可恢�
 - Java records 表达工作流版本、工具、策略、运行、审批、审计事件、评测案例和发布决策。
 - 控制面提供状态接口和 Actuator 健康检查。
 
-**当前副作用仍是合成 Mock，不连接真实订单或支付系统。** Schema 合法不代表动作获准执行；运行时策略、审批分流、金额比较和进程内幂等保护已实现，PostgreSQL 业务持久化、真实模型调用和评测 CLI 属于后续阶段。
+**当前副作用仍是合成 Mock，不连接真实订单或支付系统。** Schema 合法不代表动作获准执行；运行时策略、审批分流、金额比较和 PostgreSQL 幂等保护已实现，真实模型调用和评测 CLI 属于后续阶段。
 
 ## 快速开始
 
@@ -54,9 +54,14 @@ java -jar apps/control-plane/target/control-plane-0.2.0-SNAPSHOT.jar
 健康检查：[http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)；
 Temporal UI：[http://localhost:8233](http://localhost:8233)。
 
-退款请求可携带 `amount`、`idempotency_key` 和 `approval_status: "APPROVED"`；换货请求携带
-`sku` 和 `idempotency_key`。退款金额超过订单总额、缺少审批或缺少幂等键时会返回人工处理结果，
-不会调用 Mock Provider。相同工具重复使用同一幂等键会返回 `ACTION_REPLAYED`。
+退款请求携带 `amount` 和 `idempotency_key`，提交后通过
+`POST /api/v1/runs/{run_id}/approval` 发送独立的 Approval 记录（包括 `tool_name`、`request_hash`
+和过期时间）；换货请求携带 `sku` 和 `idempotency_key`。退款金额超过订单总额、缺少审批或缺少幂等键时会返回人工处理结果，
+不会调用 Mock Provider。相同工具重复使用同一幂等键会返回 `ACTION_REPLAYED`，参数摘要不一致会返回冲突。
+
+生产控制面默认要求 `ACTIONGATE_API_KEY` 和 `ACTIONGATE_APPROVAL_API_KEY`，Worker 需要 PostgreSQL
+（`ACTIONGATE_DB_URL`、`ACTIONGATE_DB_USERNAME`、`ACTIONGATE_DB_PASSWORD`）保存动作幂等记录。
+Temporal 的 namespace、API key 和 TLS 证书通过 `ACTIONGATE_TEMPORAL_*` 环境变量配置。
 
 默认端口被占用时，启动命令追加 `--server.port=8081`。在终端按 Ctrl+C 停止服务。
 

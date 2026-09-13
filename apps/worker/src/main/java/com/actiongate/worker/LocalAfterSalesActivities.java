@@ -15,6 +15,7 @@ import com.actiongate.policy.PolicyEvaluationContext;
 import com.actiongate.policy.PolicyEvaluator;
 import com.actiongate.policy.PolicyValidator;
 import com.actiongate.workflow.ActionResult;
+import com.actiongate.trace.Approval;
 import com.actiongate.workflow.AfterSalesActionActivities;
 import com.actiongate.workflow.AfterSalesActivities;
 import com.actiongate.workflow.OrderLookup;
@@ -32,9 +33,14 @@ public final class LocalAfterSalesActivities implements AfterSalesActivities, Af
     private final ToolValidator.CompiledTool createRefund;
     private final ToolValidator.CompiledTool createExchange;
     private final PolicyDocument policy;
-    private final MockProvider provider = new MockProvider();
+    private final MockProvider provider;
 
     public LocalAfterSalesActivities() {
+        this(new MockProvider());
+    }
+
+    public LocalAfterSalesActivities(MockProvider provider) {
+        this.provider = provider;
         try (var input = getClass().getResourceAsStream("/tools/query_order.json")) {
             if (input == null) {
                 throw new IllegalStateException("Bundled query_order contract is missing");
@@ -73,7 +79,7 @@ public final class LocalAfterSalesActivities implements AfterSalesActivities, Af
 
     @Override
     public ActionResult createRefund(String orderId, BigDecimal amount, BigDecimal orderAmount,
-                                     String idempotencyKey, TicketInput.ApprovalStatus approvalStatus) {
+                                     String idempotencyKey, Approval approval) {
         Map<String, Object> args = new LinkedHashMap<>();
         args.put("order_id", orderId);
         args.put("amount", amount);
@@ -81,16 +87,16 @@ public final class LocalAfterSalesActivities implements AfterSalesActivities, Af
         validateArguments(createRefund, args, "refund");
         PolicyDecision decision = PolicyEvaluator.evaluate(policy,
                 new PolicyEvaluationContext("create_refund", true, amount, orderAmount, idempotencyKey,
-                        approvalStatus == null ? "PENDING" : approvalStatus.name()));
+                        approval == null ? "PENDING" : approval.decision().name()));
         if (!decision.allowed()) {
-            return blocked(decision, "create_refund", approvalStatus);
+            return blocked(decision, "create_refund", approval);
         }
         return provider.createRefund(orderId, amount, idempotencyKey);
     }
 
     @Override
     public ActionResult createExchange(String orderId, String sku, BigDecimal orderAmount,
-                                       String idempotencyKey, TicketInput.ApprovalStatus approvalStatus) {
+                                       String idempotencyKey) {
         if (sku == null || sku.isBlank()) {
             throw ApplicationFailure.newNonRetryableFailure("Invalid exchange arguments", "INVALID_TOOL_ARGUMENTS");
         }
@@ -101,18 +107,18 @@ public final class LocalAfterSalesActivities implements AfterSalesActivities, Af
         validateArguments(createExchange, args, "exchange");
         PolicyDecision decision = PolicyEvaluator.evaluate(policy,
                 new PolicyEvaluationContext("create_exchange", true, null, orderAmount, idempotencyKey,
-                        approvalStatus == null ? "PENDING" : approvalStatus.name()));
+                        "APPROVED"));
         if (!decision.allowed()) {
-            return blocked(decision, "create_exchange", approvalStatus);
+            return blocked(decision, "create_exchange", null);
         }
         return provider.createExchange(orderId, sku, idempotencyKey);
     }
 
-    private ActionResult blocked(PolicyDecision decision, String tool, TicketInput.ApprovalStatus approvalStatus) {
-        boolean approval = decision.violations().contains("refund-requires-approval")
-                && approvalStatus != TicketInput.ApprovalStatus.REJECTED;
-        return new ActionResult(approval ? ActionResult.Status.APPROVAL_REQUIRED : ActionResult.Status.REJECTED,
-                null, tool, approval ? "Approval is required before this action can execute."
+    private ActionResult blocked(PolicyDecision decision, String tool, Approval approval) {
+        boolean requiresApproval = decision.violations().contains("refund-requires-approval")
+                && (approval == null || approval.decision() != Approval.Decision.REJECTED);
+        return new ActionResult(requiresApproval ? ActionResult.Status.APPROVAL_REQUIRED : ActionResult.Status.REJECTED,
+                null, tool, requiresApproval ? "Approval is required before this action can execute."
                         : "Action blocked by policy.", decision.violations());
     }
 

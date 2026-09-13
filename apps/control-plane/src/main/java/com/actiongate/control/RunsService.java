@@ -14,6 +14,7 @@ import java.util.concurrent.CancellationException;
 import java.util.function.Supplier;
 
 import com.actiongate.api.RunView;
+import com.actiongate.trace.Approval;
 import com.actiongate.workflow.AfterSalesWorkflow;
 import com.actiongate.workflow.RunResult;
 import com.actiongate.workflow.TicketInput;
@@ -93,10 +94,23 @@ public class RunsService {
         return withinDeadline(() -> view(runId, describe(runId)));
     }
 
-    private RunView withinDeadline(Supplier<RunView> operation) {
+    public Approval approve(UUID runId, Approval approval) {
+        return withinDeadline(() -> {
+            var info = describe(runId);
+            if (info.getStatus() != WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_RUNNING) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Run is no longer accepting approvals");
+            }
+            var workflow = client.newWorkflowStub(AfterSalesWorkflow.class,
+                    info.getExecution().getWorkflowId(), Optional.of(info.getExecution().getRunId()));
+            WorkflowStub.fromTyped(workflow).signal("ActionGateApprovalV1", approval);
+            return approval;
+        });
+    }
+
+    private <T> T withinDeadline(Supplier<T> operation) {
         // Run blocking SDK calls away from the servlet thread and enforce a hard HTTP budget.
         var context = Context.current().withDeadlineAfter(requestTimeout.toNanos(), TimeUnit.NANOSECONDS, deadlines);
-        Future<RunView> future = operations.submit(() -> {
+        Future<T> future = operations.submit(() -> {
             Context previous = context.attach();
             try {
                 return operation.get();

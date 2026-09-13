@@ -31,7 +31,8 @@ import org.springframework.http.MediaType;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(classes = ActionGateApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "actiongate.temporal.client-enabled=false")
+        properties = {"actiongate.temporal.client-enabled=false", "actiongate.security.enabled=false",
+                "actiongate.rate-limit.enabled=false"})
 @Import(TemporalTestConfiguration.class)
 class SubmissionIdempotencyTest {
     private static final String TICKET = "{\"order_id\":\"10001\",\"scenario\":\"ORDER_STATUS\"}";

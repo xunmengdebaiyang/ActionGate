@@ -34,4 +34,10 @@ public class RunsController {
     public RunView get(@PathVariable UUID runId) {
         return runs.get(runId);
     }
+
+    @PostMapping(path = "/{runId}/approval", consumes = "application/json")
+    public ResponseEntity<ApprovalView> approve(@PathVariable UUID runId, @RequestBody String json) {
+        ApprovalView approval = ApprovalView.from(runs.approve(runId, ApprovalRequest.parse(json).toApproval(runId)));
+        return ResponseEntity.accepted().body(approval);
+    }
 }

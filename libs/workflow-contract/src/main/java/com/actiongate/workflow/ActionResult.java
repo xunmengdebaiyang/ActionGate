@@ -9,6 +9,6 @@ public record ActionResult(Status status, String actionId, String toolName, Stri
     }
 
     public enum Status {
-        EXECUTED, IDEMPOTENT_REPLAY, APPROVAL_REQUIRED, REJECTED
+        EXECUTED, IDEMPOTENT_REPLAY, CONFLICT, APPROVAL_REQUIRED, REJECTED
     }
 }

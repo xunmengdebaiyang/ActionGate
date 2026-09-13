@@ -3,6 +3,7 @@ package com.actiongate.worker;
 import java.time.Duration;
 
 import com.actiongate.workflow.AfterSalesWorkflow;
+import com.actiongate.trace.Approval;
 import com.actiongate.workflow.RunResult;
 import com.actiongate.workflow.TicketInput;
 import io.temporal.testing.WorkflowReplayer;
@@ -36,6 +37,11 @@ class WorkflowCompatibilityTest {
         public RunResult execute(TicketInput input) {
             Workflow.sleep(Duration.ofSeconds(1));
             return new AfterSalesWorkflowImpl().execute(input);
+        }
+
+        @Override
+        public void submitApproval(Approval approval) {
+            // Deliberately unused in the incompatible replay fixture.
         }
     }
 }

@@ -65,8 +65,9 @@ bounded Activity retry,
 terminal failures, and HTTP submission/result querying. See
 [Temporal development](temporal-development.md) and [verification](temporal-verification.md).
 
-PostgreSQL business persistence, durable approval signals, real side-effect adapters, tracing export,
-model integration and evaluation commands remain future work.
+PostgreSQL stores action idempotency records and detects request-digest conflicts. Approval records
+are delivered as validated Temporal Signals, while the remaining audit persistence, real side-effect
+adapters, tracing export, model integration and evaluation commands remain future work.
 
 Workflow code must remain deterministic; network, model and tool calls belong in Activities.
 Runtime delivery semantics are at-least-once. Approval validity and idempotency at the

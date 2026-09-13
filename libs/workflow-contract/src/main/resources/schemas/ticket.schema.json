@@ -8,7 +8,6 @@
     "scenario": {"enum": ["ORDER_STATUS", "REFUND_REQUEST", "EXCHANGE_REQUEST", "INSUFFICIENT_INFORMATION"]},
     "amount": {"type": "number", "minimum": 0.01},
     "sku": {"type": "string", "minLength": 1},
-    "idempotency_key": {"type": "string", "minLength": 1},
-    "approval_status": {"enum": ["PENDING", "APPROVED", "REJECTED"]}
+    "idempotency_key": {"type": "string", "minLength": 1}
   }
 }

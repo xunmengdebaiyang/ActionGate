@@ -7,14 +7,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class TicketValidatorTest {
     @Test
-    void acceptsActionFields() {
+    void acceptsActionFieldsWithoutClientApproval() {
         var ticket = TicketValidator.parseAndValidate("""
                 {"order_id":"10001","scenario":"REFUND_REQUEST","amount":50.00,
-                 "idempotency_key":"refund-1","approval_status":"APPROVED"}
+                 "idempotency_key":"refund-1"}
                 """);
         assertEquals("10001", ticket.orderId());
         assertEquals(0, ticket.amount().compareTo(new java.math.BigDecimal("50.00")));
-        assertEquals(TicketInput.ApprovalStatus.APPROVED, ticket.approvalStatus());
+        assertNotNull(ticket.idempotencyKey());
     }
 
     @Test
@@ -23,5 +23,7 @@ class TicketValidatorTest {
                 "{\"order_id\":\"10001\",\"scenario\":\"REFUND_REQUEST\",\"amount\":0,\"idempotency_key\":\"r\"}"));
         assertThrows(ContractViolationException.class, () -> TicketValidator.parseAndValidate(
                 "{\"order_id\":\"10001\",\"scenario\":\"EXCHANGE_REQUEST\",\"sku\":\"sku-1\",\"idempotency_key\":\"\"}"));
+        assertThrows(ContractViolationException.class, () -> TicketValidator.parseAndValidate(
+                "{\"order_id\":\"10001\",\"scenario\":\"REFUND_REQUEST\",\"approval_status\":\"APPROVED\"}"));
     }
 }

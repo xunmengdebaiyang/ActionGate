@@ -9,9 +9,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
+import com.actiongate.security.RequestBodyTooLargeException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(RequestBodyTooLargeException.class)
+    ResponseEntity<ProblemDetail> requestTooLarge() {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE,
+                        "Request body exceeds the configured limit"));
+    }
     @ExceptionHandler(ContractViolationException.class)
     ResponseEntity<ProblemDetail> invalidTicket(ContractViolationException exception) {
         var detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Invalid synthetic ticket");

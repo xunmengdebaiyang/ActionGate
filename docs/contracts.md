@@ -97,8 +97,9 @@ the action.
 ## Runtime and Evaluation Data Records
 
 AgentRun binds a run ID to immutable workflow/policy version references and a status.
-Approval identifies the run, operator, decision and expiry. Its presence alone does not
-establish a currently valid approval; expiry checks belong to the future runtime.
+Approval identifies the run, operator, decision, expiry, action tool and request digest. The
+control plane delivers it through the `ActionGateApprovalV1` Temporal Signal; the workflow
+checks the run ID, decision, expiry, tool and digest before executing a refund.
 
 RunEvent includes run/step IDs, time, lowercase event_type, nonzero OTel trace/span IDs
 and pinned workflow/policy references. Persistence must eventually enforce append-only

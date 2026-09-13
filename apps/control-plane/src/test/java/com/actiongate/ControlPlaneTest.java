@@ -10,7 +10,8 @@ import org.springframework.context.annotation.Import;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(classes = ActionGateApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "actiongate.temporal.client-enabled=false")
+        properties = {"actiongate.temporal.client-enabled=false", "actiongate.security.enabled=false",
+                "actiongate.rate-limit.enabled=false"})
 @Import(TemporalTestConfiguration.class)
 class ControlPlaneTest {
     @Autowired

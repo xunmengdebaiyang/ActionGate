@@ -1,15 +1,20 @@
 package com.actiongate.worker;
 
 import java.math.BigDecimal;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 import com.actiongate.workflow.ActionResult;
 import com.actiongate.workflow.RunResult.Intent;
 import com.actiongate.workflow.TicketInput.Scenario;
 
 public final class MockProvider {
-    private final Map<String, ActionResult> actions = new ConcurrentHashMap<>();
+    private final ActionIdempotencyStore actions;
+
+    public MockProvider() {
+        this(new InMemoryActionIdempotencyStore());
+    }
+
+    public MockProvider(ActionIdempotencyStore actions) {
+        this.actions = actions;
+    }
 
     public Intent classify(Scenario scenario) {
         return switch (scenario) {
@@ -21,29 +26,25 @@ public final class MockProvider {
     }
 
     public ActionResult createRefund(String orderId, BigDecimal amount, String idempotencyKey) {
-        return execute("create_refund", idempotencyKey,
+        return execute("create_refund", idempotencyKey, orderId + "|" + amount,
                 "Refund " + amount + " CNY for order " + orderId + " was created.");
     }
 
     public ActionResult createExchange(String orderId, String sku, String idempotencyKey) {
-        return execute("create_exchange", idempotencyKey,
+        return execute("create_exchange", idempotencyKey, orderId + "|" + sku,
                 "Exchange for order " + orderId + " to SKU " + sku + " was created.");
     }
 
-    private ActionResult execute(String tool, String idempotencyKey, String message) {
-        String key = tool + ":" + idempotencyKey;
-        ActionResult existing = actions.get(key);
-        if (existing != null) {
-            return new ActionResult(ActionResult.Status.IDEMPOTENT_REPLAY, existing.actionId(), tool,
-                    existing.message(), existing.policyViolations());
+    private ActionResult execute(String tool, String idempotencyKey, String parameters, String message) {
+        return actions.executeOnce(tool, idempotencyKey, sha256(parameters), message);
+    }
+
+    private static String sha256(String value) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
         }
-        ActionResult created = new ActionResult(ActionResult.Status.EXECUTED,
-                tool + "-" + Integer.toUnsignedString(key.hashCode()), tool, message, null);
-        ActionResult raced = actions.putIfAbsent(key, created);
-        if (raced != null) {
-            return new ActionResult(ActionResult.Status.IDEMPOTENT_REPLAY, raced.actionId(), tool,
-                    raced.message(), raced.policyViolations());
-        }
-        return created;
     }
 }

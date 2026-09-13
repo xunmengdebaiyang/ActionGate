@@ -2,6 +2,7 @@ package com.actiongate.workflow;
 
 import java.math.BigDecimal;
 
+import com.actiongate.trace.Approval;
 import io.temporal.activity.ActivityInterface;
 import io.temporal.activity.ActivityMethod;
 
@@ -9,9 +10,9 @@ import io.temporal.activity.ActivityMethod;
 public interface AfterSalesActionActivities {
     @ActivityMethod(name = "ActionGateCreateRefundV1")
     ActionResult createRefund(String orderId, BigDecimal amount, BigDecimal orderAmount,
-                              String idempotencyKey, TicketInput.ApprovalStatus approvalStatus);
+                              String idempotencyKey, Approval approval);
 
     @ActivityMethod(name = "ActionGateCreateExchangeV1")
     ActionResult createExchange(String orderId, String sku, BigDecimal orderAmount,
-                                String idempotencyKey, TicketInput.ApprovalStatus approvalStatus);
+                                String idempotencyKey);
 }

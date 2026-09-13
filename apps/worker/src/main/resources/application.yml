@@ -4,10 +4,27 @@ server:
 spring:
   application:
     name: actiongate-worker
+  datasource:
+    url: ${ACTIONGATE_DB_URL:jdbc:postgresql://127.0.0.1:5432/actiongate}
+    username: ${ACTIONGATE_DB_USERNAME:actiongate}
+    password: ${ACTIONGATE_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${ACTIONGATE_DB_POOL_SIZE:10}
+  flyway:
+    enabled: ${ACTIONGATE_DB_MIGRATIONS_ENABLED:true}
 actiongate:
+  persistence:
+    tenant-id: ${ACTIONGATE_TENANT_ID:default}
   temporal:
     target: ${ACTIONGATE_TEMPORAL_TARGET:127.0.0.1:7233}
     namespace: ${ACTIONGATE_TEMPORAL_NAMESPACE:default}
+    api-key: ${ACTIONGATE_TEMPORAL_API_KEY:}
+    tls:
+      enabled: ${ACTIONGATE_TEMPORAL_TLS_ENABLED:false}
+      trust-cert-path: ${ACTIONGATE_TEMPORAL_TRUST_CERT_PATH:}
+      client-cert-path: ${ACTIONGATE_TEMPORAL_CLIENT_CERT_PATH:}
+      client-key-path: ${ACTIONGATE_TEMPORAL_CLIENT_KEY_PATH:}
+      server-name: ${ACTIONGATE_TEMPORAL_TLS_SERVER_NAME:}
     task-queue: ${ACTIONGATE_TEMPORAL_TASK_QUEUE:actiongate-after-sales-consultation-v1}
 management:
   endpoints:

@@ -7,10 +7,29 @@ spring:
   jackson:
     property-naming-strategy: SNAKE_CASE
     default-property-inclusion: non_null
+  mvc:
+    problemdetails:
+      enabled: true
 actiongate:
+  security:
+    enabled: ${ACTIONGATE_SECURITY_ENABLED:true}
+    api-key: ${ACTIONGATE_API_KEY:}
+    approval-api-key: ${ACTIONGATE_APPROVAL_API_KEY:}
+  rate-limit:
+    enabled: ${ACTIONGATE_RATE_LIMIT_ENABLED:true}
+    requests-per-minute: ${ACTIONGATE_RATE_LIMIT_PER_MINUTE:60}
+  http:
+    max-body-bytes: ${ACTIONGATE_MAX_BODY_BYTES:4096}
   temporal:
     target: ${ACTIONGATE_TEMPORAL_TARGET:127.0.0.1:7233}
     namespace: ${ACTIONGATE_TEMPORAL_NAMESPACE:default}
+    api-key: ${ACTIONGATE_TEMPORAL_API_KEY:}
+    tls:
+      enabled: ${ACTIONGATE_TEMPORAL_TLS_ENABLED:false}
+      trust-cert-path: ${ACTIONGATE_TEMPORAL_TRUST_CERT_PATH:}
+      client-cert-path: ${ACTIONGATE_TEMPORAL_CLIENT_CERT_PATH:}
+      client-key-path: ${ACTIONGATE_TEMPORAL_CLIENT_KEY_PATH:}
+      server-name: ${ACTIONGATE_TEMPORAL_TLS_SERVER_NAME:}
     task-queue: ${ACTIONGATE_TEMPORAL_TASK_QUEUE:actiongate-after-sales-consultation-v1}
     request-timeout: ${ACTIONGATE_TEMPORAL_REQUEST_TIMEOUT:5s}
 management:

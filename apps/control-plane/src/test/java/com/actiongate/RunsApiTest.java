@@ -1,11 +1,14 @@
 package com.actiongate;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import com.actiongate.workflow.AfterSalesWorkflow;
+import com.actiongate.workflow.ActionRequestFingerprint;
 import com.actiongate.workflow.RunResult;
 import com.actiongate.workflow.TicketInput;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -28,7 +31,8 @@ import org.springframework.http.MediaType;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(classes = ActionGateApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "actiongate.temporal.client-enabled=false")
+        properties = {"actiongate.temporal.client-enabled=false", "actiongate.security.enabled=false",
+                "actiongate.rate-limit.enabled=false"})
 @Import(TemporalTestConfiguration.class)
 class RunsApiTest {
     @Autowired private TestRestTemplate http;
@@ -120,5 +124,28 @@ class RunsApiTest {
         assertEquals("FAILED", result.path("status").asText());
         assertEquals("WORKFLOW_FAILED", result.path("error_code").asText());
         assertFalse(result.has("result"));
+    }
+
+    @Test
+    void approvalApiSignalsARefundAndBindsItToTheRequest() throws Exception {
+        var ticket = new TicketInput("10001", TicketInput.Scenario.REFUND_REQUEST,
+                new BigDecimal("20.00"), null, "refund-approval-api");
+        var accepted = http.postForEntity("/api/v1/runs",
+                body("{\"order_id\":\"10001\",\"scenario\":\"REFUND_REQUEST\","
+                        + "\"amount\":20.00,\"idempotency_key\":\"refund-approval-api\"}"), JsonNode.class);
+        assertEquals(202, accepted.getStatusCode().value());
+        String runId = accepted.getBody().path("run_id").asText();
+        String hash = ActionRequestFingerprint.refund(ticket);
+        var approval = http.postForEntity("/api/v1/runs/" + runId + "/approval",
+                body("{\"operator\":\"alice\",\"decision\":\"APPROVED\","
+                        + "\"expires_at\":\"" + Instant.now().plusSeconds(60) + "\","
+                        + "\"tool_name\":\"create_refund\",\"request_hash\":\"" + hash + "\"}"), JsonNode.class);
+        assertEquals(202, approval.getStatusCode().value());
+        assertEquals("APPROVED", approval.getBody().path("decision").asText());
+        var workflow = temporal.newWorkflowStub(AfterSalesWorkflow.class,
+                AfterSalesWorkflow.WORKFLOW_ID_PREFIX + runId,
+                Optional.of(accepted.getBody().path("temporal_run_id").asText()));
+        var result = WorkflowStub.fromTyped(workflow).getResult(20, TimeUnit.SECONDS, RunResult.class);
+        assertEquals(RunResult.Outcome.ACTION_EXECUTED, result.outcome());
     }
 }

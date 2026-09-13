@@ -1,0 +1,14 @@
+spring:
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+
+actiongate:
+  temporal:
+    task-queue: actiongate-after-sales-consultation-v1
+    namespace: default
+    request-timeout: 5s
+  security:
+    enabled: false
+  rate-limit:
+    enabled: false

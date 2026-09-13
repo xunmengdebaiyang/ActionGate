@@ -16,6 +16,10 @@
       <artifactId>contract-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.actiongate</groupId>
+      <artifactId>trace-contract</artifactId>
+    </dependency>
+    <dependency>
       <groupId>io.temporal</groupId>
       <artifactId>temporal-sdk</artifactId>
     </dependency>

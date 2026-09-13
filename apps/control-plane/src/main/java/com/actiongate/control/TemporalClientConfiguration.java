@@ -17,18 +17,25 @@ import org.springframework.context.annotation.Configuration;
 class TemporalClientConfiguration {
     @Bean(destroyMethod = "shutdown")
     WorkflowServiceStubs workflowServiceStubs(@Value("${actiongate.temporal.target}") String target,
-                                              @Value("${actiongate.temporal.request-timeout:5s}") Duration requestTimeout) {
+                                              @Value("${actiongate.temporal.request-timeout:5s}") Duration requestTimeout,
+                                              @Value("${actiongate.temporal.tls.enabled:false}") boolean tlsEnabled,
+                                              @Value("${actiongate.temporal.tls.trust-cert-path:}") String trustCertPath,
+                                              @Value("${actiongate.temporal.tls.client-cert-path:}") String clientCertPath,
+                                              @Value("${actiongate.temporal.tls.client-key-path:}") String clientKeyPath,
+                                              @Value("${actiongate.temporal.api-key:}") String apiKey,
+                                              @Value("${actiongate.temporal.tls.server-name:}") String serverName) {
         Duration rpcTimeout = requestTimeout.compareTo(Duration.ofSeconds(3)) < 0
                 ? requestTimeout : Duration.ofSeconds(3);
-        return WorkflowServiceStubs.newServiceStubs(WorkflowServiceStubsOptions.newBuilder()
-                .setTarget(target)
+        var options = TemporalTls.apply(WorkflowServiceStubsOptions.newBuilder().setTarget(target), tlsEnabled,
+                trustCertPath, clientCertPath, clientKeyPath, apiKey, serverName)
                 .setRpcTimeout(rpcTimeout)
                 .setRpcRetryOptions(RpcRetryOptions.newBuilder()
                         .setExpiration(requestTimeout)
                         .setInitialInterval(Duration.ofMillis(100))
                         .setMaximumInterval(Duration.ofSeconds(1))
                         .build())
-                .build());
+                .build();
+        return WorkflowServiceStubs.newServiceStubs(options);
     }
 
     @Bean
