@@ -11,17 +11,17 @@ public final class ActionRequestFingerprint {
     }
 
     public static String refund(TicketInput input) {
-        return digest(canonical("create_refund", input.orderId(), input.amount(), null,
+        return digest(canonical("create_refund", input.orderId(), input.amount(), input.currency(), null,
                 input.idempotencyKey()));
     }
 
     public static String exchange(TicketInput input) {
-        return digest(canonical("create_exchange", input.orderId(), null, input.sku(),
+        return digest(canonical("create_exchange", input.orderId(), null, input.currency(), input.sku(),
                 input.idempotencyKey()));
     }
 
-    private static String canonical(String tool, String orderId, Object amount, String sku, String key) {
-        return String.join("|", tool, value(orderId), value(amount), value(sku), value(key));
+    private static String canonical(String tool, String orderId, Object amount, String currency, String sku, String key) {
+        return String.join("|", tool, value(orderId), value(amount), value(currency), value(sku), value(key));
     }
 
     private static String value(Object value) {

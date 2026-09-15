@@ -25,5 +25,9 @@ class TicketValidatorTest {
                 "{\"order_id\":\"10001\",\"scenario\":\"EXCHANGE_REQUEST\",\"sku\":\"sku-1\",\"idempotency_key\":\"\"}"));
         assertThrows(ContractViolationException.class, () -> TicketValidator.parseAndValidate(
                 "{\"order_id\":\"10001\",\"scenario\":\"REFUND_REQUEST\",\"approval_status\":\"APPROVED\"}"));
+        assertThrows(ContractViolationException.class, () -> TicketValidator.parseAndValidate(
+                "{\"order_id\":\"10001\",\"scenario\":\"REFUND_REQUEST\",\"amount\":1.001,\"currency\":\"CNY\"}"));
+        assertThrows(ContractViolationException.class, () -> TicketValidator.parseAndValidate(
+                "{\"order_id\":\"10001\",\"scenario\":\"REFUND_REQUEST\",\"amount\":1,\"currency\":\"cny\"}"));
     }
 }

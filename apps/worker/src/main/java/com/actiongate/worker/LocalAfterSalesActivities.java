@@ -26,6 +26,8 @@ import com.actiongate.workflow.TicketInput.Scenario;
 import io.temporal.failure.ApplicationFailure;
 
 public final class LocalAfterSalesActivities implements AfterSalesActivities, AfterSalesActionActivities {
+    private static final String POLICY_VERSION = "1.0.0";
+    private static final String POLICY_HASH = "108beff88b021bee476714f74b71ff0c34010a7a224c9d3b6bb719d88c5b654b";
     private static final Map<String, OrderSummary> ORDERS = Map.of(
             "10001", new OrderSummary("10001", new BigDecimal("199.00"), "CNY", OrderSummary.Status.SHIPPED),
             "10002", new OrderSummary("10002", new BigDecimal("89.90"), "CNY", OrderSummary.Status.PROCESSING));
@@ -91,7 +93,7 @@ public final class LocalAfterSalesActivities implements AfterSalesActivities, Af
         if (!decision.allowed()) {
             return blocked(decision, "create_refund", approval);
         }
-        return provider.createRefund(orderId, amount, idempotencyKey);
+        return withPolicy(provider.createRefund(orderId, amount, idempotencyKey));
     }
 
     @Override
@@ -111,7 +113,7 @@ public final class LocalAfterSalesActivities implements AfterSalesActivities, Af
         if (!decision.allowed()) {
             return blocked(decision, "create_exchange", null);
         }
-        return provider.createExchange(orderId, sku, idempotencyKey);
+        return withPolicy(provider.createExchange(orderId, sku, idempotencyKey));
     }
 
     private ActionResult blocked(PolicyDecision decision, String tool, Approval approval) {
@@ -119,7 +121,12 @@ public final class LocalAfterSalesActivities implements AfterSalesActivities, Af
                 && (approval == null || approval.decision() != Approval.Decision.REJECTED);
         return new ActionResult(requiresApproval ? ActionResult.Status.APPROVAL_REQUIRED : ActionResult.Status.REJECTED,
                 null, tool, requiresApproval ? "Approval is required before this action can execute."
-                        : "Action blocked by policy.", decision.violations());
+                        : "Action blocked by policy.", decision.violations(), POLICY_VERSION, POLICY_HASH);
+    }
+
+    private static ActionResult withPolicy(ActionResult result) {
+        return new ActionResult(result.status(), result.actionId(), result.toolName(), result.message(),
+                result.policyViolations(), POLICY_VERSION, POLICY_HASH);
     }
 
     private static void validateArguments(ToolValidator.CompiledTool tool, Map<String, Object> args,

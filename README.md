@@ -15,6 +15,8 @@ ActionGate 是一个面向高风险工具调用的 Agent 发布门禁与可恢�
 - Policy 沿用方案书的 `when / assert / on_violation` 结构，支持四种初始规则，拒绝未知字段和重复规则 ID。
 - Policy 运行时求值已接入副作用活动：策略违规转人工处理，不会调用 Mock Provider；动作结果区分执行成功、幂等重放、需要审批和策略拒绝。
 - Java records 表达工作流版本、工具、策略、运行、审批、审计事件、评测案例和发布决策。
+- 金额以带 ISO-4217 货币代码的 `Money` 值对象表达，内部使用分为单位的整数并固定两位小数精度。
+- 审批、策略检查和动作结果会写入不可变的 `RunEvent` 审计事件，并随运行结果返回。
 - 控制面提供状态接口和 Actuator 健康检查。
 
 **当前副作用仍是合成 Mock，不连接真实订单或支付系统。** Schema 合法不代表动作获准执行；运行时策略、审批分流、金额比较和 PostgreSQL 幂等保护已实现，真实模型调用和评测 CLI 属于后续阶段。
@@ -54,7 +56,7 @@ java -jar apps/control-plane/target/control-plane-0.2.0-SNAPSHOT.jar
 健康检查：[http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)；
 Temporal UI：[http://localhost:8233](http://localhost:8233)。
 
-退款请求携带 `amount` 和 `idempotency_key`，提交后通过
+退款请求携带 `amount`、`currency` 和 `idempotency_key`，提交后通过
 `POST /api/v1/runs/{run_id}/approval` 发送独立的 Approval 记录（包括 `tool_name`、`request_hash`
 和过期时间）；换货请求携带 `sku` 和 `idempotency_key`。退款金额超过订单总额、缺少审批或缺少幂等键时会返回人工处理结果，
 不会调用 Mock Provider。相同工具重复使用同一幂等键会返回 `ACTION_REPLAYED`，参数摘要不一致会返回冲突。

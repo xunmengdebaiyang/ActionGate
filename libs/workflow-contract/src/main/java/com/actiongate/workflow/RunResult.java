@@ -1,11 +1,27 @@
 package com.actiongate.workflow;
 
 import com.actiongate.contract.VersionReference;
+import com.actiongate.trace.RunEvent;
+import java.util.List;
 
 public record RunResult(Outcome outcome, Intent intent, Reason reason, String reply, OrderSummary order,
-                        VersionReference workflowVersion, VersionReference providerVersion) {
+                        VersionReference workflowVersion, VersionReference providerVersion,
+                        List<RunEvent> auditEvents) {
     public static final VersionReference WORKFLOW = new VersionReference("after-sales-consultation", "1.0.0");
     public static final VersionReference PROVIDER = new VersionReference("mock-scenarios", "1.0.0");
+
+    public RunResult(Outcome outcome, Intent intent, Reason reason, String reply, OrderSummary order,
+                     VersionReference workflowVersion, VersionReference providerVersion) {
+        this(outcome, intent, reason, reply, order, workflowVersion, providerVersion, List.of());
+    }
+
+    public RunResult {
+        auditEvents = auditEvents == null ? List.of() : List.copyOf(auditEvents);
+    }
+
+    public RunResult withAuditEvents(List<RunEvent> events) {
+        return new RunResult(outcome, intent, reason, reply, order, workflowVersion, providerVersion, events);
+    }
 
     public enum Outcome {
         ANSWERED, ACTION_EXECUTED, ACTION_REPLAYED, MANUAL_REQUIRED

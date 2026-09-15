@@ -15,6 +15,15 @@ import com.actiongate.workflow.RunResult.Intent;
 import com.actiongate.workflow.RunResult.Outcome;
 import com.actiongate.workflow.RunResult.Reason;
 import com.actiongate.workflow.TicketInput;
+import com.actiongate.workflow.Money;
+import com.actiongate.trace.RunEvent;
+import com.actiongate.contract.VersionReference;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import io.temporal.activity.ActivityOptions;
 import io.temporal.common.RetryOptions;
 import io.temporal.failure.ApplicationFailure;
@@ -22,6 +31,7 @@ import io.temporal.workflow.Workflow;
 
 public class AfterSalesWorkflowImpl implements AfterSalesWorkflow {
     private Approval approval;
+    private final List<RunEvent> auditEvents = new ArrayList<>();
     private final AfterSalesActivities activities = Workflow.newActivityStub(AfterSalesActivities.class,
             ActivityOptions.newBuilder()
                     .setStartToCloseTimeout(Duration.ofSeconds(5))
@@ -45,6 +55,7 @@ public class AfterSalesWorkflowImpl implements AfterSalesWorkflow {
 
     @Override
     public RunResult execute(TicketInput input) {
+        audit(RunEvent.EventType.RUN_STARTED, "workflow", Map.of("workflow_version", RunResult.WORKFLOW.version()));
         if (input == null || input.scenario() == null) {
             throw ApplicationFailure.newNonRetryableFailure("Scenario is required", "INVALID_TICKET");
         }
@@ -70,7 +81,7 @@ public class AfterSalesWorkflowImpl implements AfterSalesWorkflow {
         if (intent == null) {
             throw ApplicationFailure.newNonRetryableFailure("Missing provider intent", "INVALID_PROVIDER_OUTPUT");
         }
-        return switch (intent) {
+        RunResult result = switch (intent) {
             case QUESTION -> new RunResult(Outcome.ANSWERED, intent, Reason.CONSULTATION_ANSWERED,
                     "Order " + order.orderId() + " is " + order.status() + ".", order,
                     RunResult.WORKFLOW, RunResult.PROVIDER);
@@ -78,7 +89,10 @@ public class AfterSalesWorkflowImpl implements AfterSalesWorkflow {
                 if (input.amount() == null || input.idempotencyKey() == null) {
                     yield manual(intent, Reason.REFUND_REQUIRES_HUMAN, order);
                 }
-                if (input.amount().compareTo(order.amount()) > 0) {
+                if (!input.currency().equals(order.currency())) {
+                    yield manual(intent, Reason.POLICY_BLOCKED, order, "Currency does not match the order currency.");
+                }
+                if (Money.of(input.amount(), input.currency()).isGreaterThan(order.money())) {
                     yield manual(intent, Reason.POLICY_BLOCKED, order,
                             "Action blocked by policy. Violations: refund-within-order-amount");
                 }
@@ -106,6 +120,8 @@ public class AfterSalesWorkflowImpl implements AfterSalesWorkflow {
             }
             case MANUAL -> manual(intent, Reason.INSUFFICIENT_INFORMATION, order);
         };
+        audit(RunEvent.EventType.RUN_COMPLETED, "workflow", Map.of("outcome", result.outcome().name()));
+        return result.withAuditEvents(auditEvents);
     }
 
     @Override
@@ -116,12 +132,23 @@ public class AfterSalesWorkflowImpl implements AfterSalesWorkflow {
             return;
         }
         approval = candidate;
+        audit(RunEvent.EventType.APPROVAL_DECIDED, "approval", Map.of("operator", candidate.operator(),
+                "decision", candidate.decision().name(), "tool_name", candidate.toolName(),
+                "request_hash", candidate.requestHash()));
     }
 
     private RunResult actionResult(Intent intent, OrderSummary order, ActionResult action) {
         if (action == null || action.status() == null) {
             throw ApplicationFailure.newNonRetryableFailure("Invalid action result", "INVALID_ACTION_RESULT");
         }
+        audit(RunEvent.EventType.POLICY_CHECKED, action.toolName(), Map.of("status", action.status().name(),
+                "violations", String.join(",", action.policyViolations()),
+                "policy_version", action.policyVersion() == null ? "" : action.policyVersion(),
+                "policy_hash", action.policyHash() == null ? "" : action.policyHash()));
+        audit(RunEvent.EventType.TOOL_EXECUTED, action.toolName(), Map.of("status", action.status().name(),
+                "action_id", action.actionId() == null ? "" : action.actionId(),
+                "policy_version", action.policyVersion() == null ? "" : action.policyVersion(),
+                "policy_hash", action.policyHash() == null ? "" : action.policyHash()));
         return switch (action.status()) {
             case EXECUTED -> new RunResult(Outcome.ACTION_EXECUTED, intent,
                     intent == Intent.REFUND ? Reason.REFUND_EXECUTED : Reason.EXCHANGE_EXECUTED,
@@ -133,6 +160,22 @@ public class AfterSalesWorkflowImpl implements AfterSalesWorkflow {
             case REJECTED -> manual(intent, Reason.POLICY_BLOCKED, order,
                     action.message() + " Violations: " + String.join(",", action.policyViolations()));
         };
+    }
+
+    private void audit(RunEvent.EventType type, String step, Map<String, String> details) {
+        byte[] digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256").digest((Workflow.getInfo().getWorkflowId() + ":" + step + ":" + auditEvents.size())
+                    .getBytes(StandardCharsets.UTF_8));
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
+        String hex = java.util.HexFormat.of().formatHex(digest);
+        auditEvents.add(new RunEvent(java.util.UUID.nameUUIDFromBytes(digest),
+                java.util.UUID.nameUUIDFromBytes(Workflow.getInfo().getWorkflowId().getBytes(StandardCharsets.UTF_8)),
+                step, type, Instant.ofEpochMilli(Workflow.currentTimeMillis()), hex.substring(0, 32),
+                hex.substring(0, 16), RunResult.WORKFLOW,
+                new VersionReference("after-sales-safety", "1.0.0"), details));
     }
 
     private RunResult manual(Intent intent, Reason reason, OrderSummary order) {

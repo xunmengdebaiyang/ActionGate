@@ -93,7 +93,7 @@ An action request contains no approval status. Submit the refund first, then sen
 Approval record to the run:
 
 ```json
-{"order_id":"10001","scenario":"REFUND_REQUEST","amount":50.00,
+{"order_id":"10001","scenario":"REFUND_REQUEST","amount":50.00,"currency":"CNY",
  "idempotency_key":"refund-10001-1"}
 ```
 
@@ -102,6 +102,11 @@ The approval endpoint is `POST /api/v1/runs/{run_id}/approval` and accepts `oper
 `request_hash` is the digest of the canonical action parameters. The workflow checks the run,
 tool, digest, decision and expiry before calling the action Activity; invalid or expired
 approvals complete with `MANUAL_REQUIRED`.
+
+Amounts use an explicit three-letter ISO-4217 currency and at most two decimal places. The
+runtime `Money` value object converts valid amounts to integer minor units before comparison.
+Completed results contain immutable audit events for approval decisions, policy checks and tool
+execution, including the policy version and SHA-256 policy hash.
 
 An exchange uses `sku` and `idempotency_key`. Action fields are optional for compatibility;
 an action scenario without its required fields remains a manual result. Amounts are checked

@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
 
 import com.actiongate.trace.Approval;
 import com.actiongate.workflow.ActionRequestFingerprint;
@@ -65,6 +68,9 @@ class AfterSalesActionWorkflowTest {
         assertEquals(RunResult.Outcome.ACTION_EXECUTED, result.outcome());
         assertEquals(RunResult.Reason.REFUND_EXECUTED, result.reason());
         assertTrue(result.reply().contains("was created"));
+        assertTrue(result.auditEvents().stream().anyMatch(event -> event.eventType() == com.actiongate.trace.RunEvent.EventType.APPROVAL_DECIDED));
+        assertTrue(result.auditEvents().stream().anyMatch(event -> event.eventType() == com.actiongate.trace.RunEvent.EventType.POLICY_CHECKED
+                && event.details().containsKey("policy_hash")));
     }
 
     @Test
@@ -97,5 +103,25 @@ class AfterSalesActionWorkflowTest {
         assertEquals(RunResult.Outcome.ACTION_EXECUTED, first.outcome());
         assertEquals(RunResult.Outcome.ACTION_REPLAYED, second.outcome());
         assertEquals(RunResult.Reason.IDEMPOTENT_REPLAY, second.reason());
+    }
+
+    @Test
+    void concurrentActionRequestsProduceOneExecutionAndReplays() throws Exception {
+        var provider = new MockProvider(new InMemoryActionIdempotencyStore());
+        var tasks = java.util.stream.IntStream.range(0, 8)
+                .<Callable<com.actiongate.workflow.ActionResult>>mapToObj(i ->
+                        () -> provider.createExchange("10001", "SKU-CONCURRENT", "same-key")).toList();
+        List<com.actiongate.workflow.ActionResult> results;
+        try (var pool = Executors.newFixedThreadPool(8)) {
+            results = pool.invokeAll(tasks).stream().map(future -> {
+                try {
+                    return future.get();
+                } catch (Exception exception) {
+                    throw new AssertionError(exception);
+                }
+            }).toList();
+        }
+        assertEquals(1, results.stream().filter(r -> r.status() == com.actiongate.workflow.ActionResult.Status.EXECUTED).count());
+        assertEquals(7, results.stream().filter(r -> r.status() == com.actiongate.workflow.ActionResult.Status.IDEMPOTENT_REPLAY).count());
     }
 }

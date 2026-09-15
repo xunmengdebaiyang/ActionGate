@@ -3,6 +3,7 @@ package com.actiongate.trace;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.Map;
 
 import com.actiongate.contract.VersionReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -11,7 +12,7 @@ import static com.actiongate.contract.ContractViolationException.require;
 
 public record RunEvent(UUID eventId, UUID runId, String stepId, EventType eventType, Instant occurredAt,
                        String traceId, String spanId, VersionReference workflowVersion,
-                       VersionReference policyVersion) {
+                       VersionReference policyVersion, Map<String, String> details) {
     public RunEvent {
         Objects.requireNonNull(eventId);
         Objects.requireNonNull(runId);
@@ -19,11 +20,19 @@ public record RunEvent(UUID eventId, UUID runId, String stepId, EventType eventT
         Objects.requireNonNull(occurredAt);
         Objects.requireNonNull(workflowVersion);
         Objects.requireNonNull(policyVersion);
+        details = details == null ? Map.of() : Map.copyOf(details);
         require(stepId != null && !stepId.isBlank(), "Event stepId is required");
         require(traceId != null && traceId.matches("[0-9a-f]{32}") && !traceId.equals("0".repeat(32)),
                 "traceId must be a nonzero 32-character lowercase hex value");
         require(spanId != null && spanId.matches("[0-9a-f]{16}") && !spanId.equals("0".repeat(16)),
                 "spanId must be a nonzero 16-character lowercase hex value");
+    }
+
+    public RunEvent(UUID eventId, UUID runId, String stepId, EventType eventType, Instant occurredAt,
+                    String traceId, String spanId, VersionReference workflowVersion,
+                    VersionReference policyVersion) {
+        this(eventId, runId, stepId, eventType, occurredAt, traceId, spanId, workflowVersion,
+                policyVersion, Map.of());
     }
 
     public enum EventType {

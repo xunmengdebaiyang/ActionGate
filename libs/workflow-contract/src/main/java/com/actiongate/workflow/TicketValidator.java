@@ -13,6 +13,14 @@ public final class TicketValidator {
 
     public static TicketInput parseAndValidate(String json) {
         require(json != null && json.length() <= 4096, "Ticket must be a JSON document of at most 4096 characters");
-        return ContractJson.convert(SCHEMA.validate(json), TicketInput.class);
+        try {
+            TicketInput input = ContractJson.convert(SCHEMA.validate(json), TicketInput.class);
+            if (input.amount() != null) {
+                Money.of(input.amount(), input.currency());
+            }
+            return input;
+        } catch (IllegalArgumentException exception) {
+            throw new com.actiongate.contract.ContractViolationException(java.util.List.of(exception.getMessage()));
+        }
     }
 }
